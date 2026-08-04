@@ -9,6 +9,27 @@ Newest first.
 
 ## M2 — hotkey and injection
 
+### Measured, on the target machine
+
+Key-up to inserted text, `dictate` on the same RTX 5070 Ti:
+
+| | Transcribe | Inject | Key-up → text |
+|---|---|---|---|
+| Language auto-detected | 385 ms | 5 ms | 423 ms |
+| `--language ru` | 271 ms | 5 ms | **315 ms** |
+
+Injection is 5 ms against a 50 ms budget — the clipboard path costs almost
+nothing, and the wait to restore happens on another thread after the text has
+already landed.
+
+The 114 ms difference is whisper's language detector, exactly as it was in M1.
+The app must pin the language once the user has chosen one; leaving it on auto
+spends a quarter of the transcription budget deciding something the user
+already knows.
+
+Both numbers are still record-then-transcribe. M3's sliding window only has to
+finish the tail after key-up, so there is room.
+
 ### The hook callback is on the system's critical path
 
 `WH_KEYBOARD_LL` callbacks run on the thread that installed the hook, and while
