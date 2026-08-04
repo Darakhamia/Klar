@@ -15,7 +15,7 @@ use std::path::Path;
 use std::time::Duration;
 use whisper_rs::{WhisperVadContext, WhisperVadContextParams, WhisperVadParams};
 
-use crate::asr::{AsrError, Backend};
+use crate::asr::AsrError;
 use crate::audio::SAMPLE_RATE;
 
 /// A stretch of speech, in samples relative to the buffer it was found in.
@@ -75,8 +75,22 @@ pub struct Vad {
 }
 
 impl Vad {
-    /// Load the Silero model. Uses the GPU when the build has one, since it
-    /// runs on the same ggml backend whisper does.
+    /// Load the Silero model.
+    ///
+    /// Always on the CPU. Asking whisper.cpp 1.8.3 for a GPU VAD context puts
+    /// the weights in a CUDA buffer and then fails to find a device for the
+    /// compute backend, and ggml aborts the process rather than returning an
+    /// error:
+    ///
+    /// ```text
+    /// whisper_vad_init_with_params:   CUDA0 total size = 0.88 MB
+    /// whisper_backend_init_gpu: no GPU found
+    /// pre-allocated tensor (leaf_0) in a buffer (CUDA0) that cannot run the operation
+    /// ```
+    ///
+    /// There is nothing to fall back from — the process is already gone. The
+    /// model is under a megabyte and costs a few percent of real time on the
+    /// CPU, so this is not a loss worth chasing.
     pub fn load(model: &Path, settings: VadSettings) -> Result<Self, AsrError> {
         if !model.is_file() {
             return Err(AsrError::ModelMissing(model.to_path_buf()));
@@ -90,7 +104,7 @@ impl Vad {
         })?;
 
         let mut params = WhisperVadContextParams::new();
-        params.set_use_gpu(Backend::compiled().is_gpu());
+        params.set_use_gpu(false);
 
         let context = WhisperVadContext::new(path, params)
             .map_err(|e| AsrError::Load(format!("VAD: {e}")))?;

@@ -16,9 +16,28 @@ is ONNX Runtime: a build-time binary download, another ~15 MB library in the
 installer, and one more thing to sign at M7 — all to run a model of under a
 megabyte.
 
-whisper.cpp 1.8 ships Silero itself, and whisper-rs 0.16 exposes it. Same ggml
-backend that is already initialised, so it runs on CUDA alongside the ASR, and
-the model is 885 KB. The stack line in CLAUDE.md now says so.
+whisper.cpp 1.8 ships Silero itself, and whisper-rs 0.16 exposes it — no second
+runtime, and the model is 885 KB. The stack line in CLAUDE.md now says so.
+
+### The VAD does not run on the GPU, and asking kills the process
+
+It shares ggml with the ASR, so running the VAD on CUDA looked free. It is not.
+`whisper_vad_init_with_params` with `use_gpu` puts the weights in a CUDA buffer
+and then its backend init reports `no GPU found`, leaving tensors somewhere the
+compute backend cannot reach:
+
+```
+whisper_vad_init_with_params:   CUDA0 total size = 0.88 MB
+whisper_backend_init_gpu: no GPU found
+ggml-backend.cpp:807: pre-allocated tensor (leaf_0) in a buffer (CUDA0)
+                      that cannot run the operation (NONE)
+```
+
+ggml calls `GGML_ABORT`, so the process dies — there is no error to catch and
+nothing to fall back from. `Vad::load` therefore passes `use_gpu(false)`
+unconditionally. At under a megabyte and a few percent of real time this costs
+nothing worth chasing, but it is exactly the kind of assumption that has to be
+run before it is believed.
 
 ### The obvious VAD loop is quadratic
 
