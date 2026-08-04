@@ -56,6 +56,25 @@ Note that a CPU build exercises everything in M1 except the latency budget, so
 capture, model download and transcription accuracy can all be verified while
 the toolkit downloads.
 
+### Silence does not come back as an empty transcript
+
+Whisper given near-silence does not return "". It invents a plausible sentence,
+and with the language pinned it will still reach for another alphabet — a five
+second silent take came back as `Д 새로운 городской грани Русанови`. A test
+dictation that produced nothing therefore looks identical to one that produced
+nonsense, and the natural conclusion is that the model or the GPU is broken.
+
+`klar-cli` now prints SPEAK NOW, shows a live level meter while recording, and
+refuses to transcribe a buffer whose peak is under 0.01, naming the device
+instead. The app will need the same guard on the real path.
+
+### LNK4098: LIBCMT conflicts
+
+The CUDA build links objects compiled against the static CRT alongside Rust's
+dynamic one. The warning is benign in practice — noted here because a genuine
+CRT mismatch shows up much later as corruption around allocations, and it would
+be a shame to rediscover this line then.
+
 ### Four build prerequisites, none of which name themselves
 
 Building `whisper-rs` on Windows needs four things beyond the Rust toolchain,

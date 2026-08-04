@@ -250,6 +250,7 @@ fn capture(seconds: f32, device: Option<&str>) -> Result<Vec<f32>> {
     };
     let (capture, rx) = Capture::start(&config).context("opening the microphone")?;
     let format = capture.format();
+    let capture_name = capture.device_name().to_owned();
 
     println!(
         "recording     {} — {} Hz, {} ch, {:.1} s",
@@ -259,26 +260,75 @@ fn capture(seconds: f32, device: Option<&str>) -> Result<Vec<f32>> {
         seconds
     );
 
+    println!("\nSPEAK NOW");
+
     let deadline = Instant::now() + Duration::from_secs_f32(seconds);
     let mut raw = Vec::new();
+    let mut meter_at = Instant::now();
+
     while Instant::now() < deadline {
+        let before = raw.len();
         if audio::capture::drain(&rx, &mut raw).is_none() {
             bail!("the capture stream stopped early");
         }
+
+        // A live level meter, not a row of dots. A silent take is the most
+        // likely reason a test dictation comes back as nonsense, and it has to
+        // be obvious while it is happening rather than afterwards.
+        if meter_at.elapsed() >= Duration::from_millis(100) {
+            meter_at = Instant::now();
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            print!(
+                "\r{}  {:>4.1}s ",
+                meter(audio::peak(&raw[before..])),
+                remaining.as_secs_f32()
+            );
+            std::io::stdout().flush().ok();
+        }
+
         std::thread::sleep(Duration::from_millis(20));
-        print!(".");
-        std::io::stdout().flush().ok();
     }
     // One last pass: the callback may have delivered a block while we slept.
     audio::capture::drain(&rx, &mut raw);
     capture.stop();
-    println!();
+    println!("\r{:60}", "");
 
     if raw.is_empty() {
         bail!("the microphone delivered no audio at all");
     }
 
-    audio::to_whisper_input(&raw, format).context("converting to 16 kHz mono")
+    let samples = audio::to_whisper_input(&raw, format).context("converting to 16 kHz mono")?;
+
+    // Whisper does not return an empty string for silence — it invents a
+    // plausible sentence, sometimes in the wrong alphabet entirely. Refusing
+    // here turns a confusing result into a clear one.
+    let peak = audio::peak(&samples);
+    if peak < SILENCE_PEAK {
+        bail!(
+            "the microphone recorded silence (peak {peak:.4}). \n\
+             Check that '{}' is the right device and is not muted — \n\
+             `klar-cli devices` lists the alternatives.",
+            capture_name
+        );
+    }
+
+    Ok(samples)
+}
+
+/// Below this, there is no speech in the buffer — only the noise floor.
+const SILENCE_PEAK: f32 = 0.01;
+
+/// A twenty-cell bar. Peak is scaled with a square root so quiet speech still
+/// moves it; this is a "is anything arriving" indicator, not a VU meter.
+fn meter(peak: f32) -> String {
+    const CELLS: usize = 20;
+    let filled = (peak.sqrt() * CELLS as f32).round().min(CELLS as f32) as usize;
+    let mark = if peak < SILENCE_PEAK { ' ' } else { '#' };
+    format!(
+        "[{}{}]",
+        String::from_iter(std::iter::repeat_n(mark, filled)),
+        " ".repeat(CELLS - filled)
+    )
 }
 
 fn run_asr(samples: &[f32], model_id: &str, language: Option<&str>) -> Result<()> {
