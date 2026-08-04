@@ -47,4 +47,12 @@ impl TextInjector for NoInjector {
     fn inject(&mut self, _text: &str) -> Result<InjectionMethod, PlatformError> {
         Err(PlatformError::NotImplemented("text injection"))
     }
+
+    fn inject_using(
+        &mut self,
+        _text: &str,
+        _method: InjectionMethod,
+    ) -> Result<InjectionMethod, PlatformError> {
+        Err(PlatformError::NotImplemented("text injection"))
+    }
 }

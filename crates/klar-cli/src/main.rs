@@ -9,6 +9,7 @@ use klar_core::asr::{Backend, TranscribeOptions, Transcriber, WhisperTranscriber
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
 use klar_core::{Input, Machine};
+use klar_platform::{HotkeyEvent, InjectionMethod};
 use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -38,6 +39,13 @@ enum Command {
     Transcribe(TranscribeArgs),
     /// Record, then transcribe. The M1 acceptance criterion end to end.
     Listen(ListenArgs),
+    /// Type text into whatever window is focused. No microphone involved.
+    Inject(InjectArgs),
+    /// Watch the push-to-talk hotkey and print its events.
+    Hotkey,
+    /// Hold the hotkey, speak, release, and the text lands in the focused app.
+    /// The M2 acceptance criterion end to end.
+    Dictate(DictateArgs),
     /// Manage the whisper models.
     #[command(subcommand)]
     Model(ModelCommand),
@@ -84,6 +92,49 @@ struct ListenArgs {
     language: Option<String>,
 }
 
+#[derive(clap::Args)]
+struct InjectArgs {
+    /// The text to insert.
+    text: String,
+    /// clipboard (default) or keystrokes.
+    #[arg(long, default_value = "clipboard")]
+    method: Method,
+    /// Seconds to wait before injecting, so you can focus the target window.
+    #[arg(long, default_value_t = 3.0)]
+    delay: f32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum Method {
+    Clipboard,
+    Keystrokes,
+}
+
+impl From<Method> for InjectionMethod {
+    fn from(method: Method) -> Self {
+        match method {
+            Method::Clipboard => Self::Clipboard,
+            Method::Keystrokes => Self::Keystrokes,
+        }
+    }
+}
+
+#[derive(clap::Args)]
+struct DictateArgs {
+    #[arg(long)]
+    device: Option<String>,
+    #[arg(long, default_value = model::DEFAULT_MODEL)]
+    model: String,
+    #[arg(long)]
+    language: Option<String>,
+    /// Longest utterance to accept, as a guard against a stuck key.
+    #[arg(long, default_value_t = 60.0)]
+    max_seconds: f32,
+    /// Transcribe but do not inject. For checking recognition without a target.
+    #[arg(long)]
+    dry: bool,
+}
+
 #[derive(Subcommand)]
 enum ModelCommand {
     /// Show the catalogue and what is installed.
@@ -118,6 +169,9 @@ async fn main() -> Result<()> {
         Command::Record(args) => record(&args),
         Command::Transcribe(args) => transcribe(&args),
         Command::Listen(args) => listen(&args),
+        Command::Inject(args) => inject(&args),
+        Command::Hotkey => hotkey(),
+        Command::Dictate(args) => dictate(&args),
         Command::Model(command) => model_command(command).await,
         Command::DryRun => dry_run(),
     }
@@ -367,6 +421,241 @@ fn run_asr(samples: &[f32], model_id: &str, language: Option<&str>) -> Result<()
         println!("language      {language}");
     }
 
+    Ok(())
+}
+
+/// Insert text into the focused window. The delay exists because the terminal
+/// is focused when you press Enter, and typing into it proves nothing.
+fn inject(args: &InjectArgs) -> Result<()> {
+    let method: InjectionMethod = args.method.into();
+    println!("focus the target window — injecting in {:.0}s", args.delay);
+    for remaining in (1..=args.delay.ceil() as u32).rev() {
+        print!("\r{remaining} ");
+        std::io::stdout().flush().ok();
+        std::thread::sleep(Duration::from_secs(1));
+    }
+    println!("\r      ");
+
+    let started = Instant::now();
+    let used = klar_platform::injector().inject_using(&args.text, method)?;
+    println!(
+        "injected via {used:?} in {} ms",
+        started.elapsed().as_millis()
+    );
+    Ok(())
+}
+
+/// Print hotkey events until interrupted. The quickest way to tell whether the
+/// low-level hook is installed and whether both edges arrive.
+fn hotkey() -> Result<()> {
+    let binding = klar_platform::default_binding();
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    let mut hotkey = klar_platform::hotkey();
+    hotkey.register(
+        &binding,
+        Box::new(move |event| {
+            let _ = tx.send(event);
+        }),
+    )?;
+
+    println!("hold {binding:?} anywhere. Ctrl+C to stop.");
+
+    let mut pressed_at: Option<Instant> = None;
+    for event in rx {
+        match event {
+            HotkeyEvent::Pressed => {
+                pressed_at = Some(Instant::now());
+                println!("down");
+            }
+            HotkeyEvent::Released => {
+                let held = pressed_at.take().map_or(0, |at| at.elapsed().as_millis());
+                println!("up    (held {held} ms)");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The whole thing: hold the hotkey, speak, release, text appears.
+fn dictate(args: &DictateArgs) -> Result<()> {
+    let spec = model::find(&args.model)
+        .with_context(|| format!("unknown model '{}' — try `klar-cli model list`", args.model))?;
+    let path = model::path_in(&models_dir()?, spec);
+    if !path.is_file() {
+        bail!(
+            "{} is not installed — run `klar-cli model download {}`",
+            spec.id,
+            spec.id
+        );
+    }
+
+    // The model is loaded once and stays resident. Loading it after the user has
+    // started speaking would lose the beginning of the sentence — the reason
+    // M3 keeps it in memory too.
+    println!("loading {} ...", spec.id);
+    let mut transcriber = WhisperTranscriber::load(&path)?;
+    let mut injector = klar_platform::injector();
+
+    let binding = klar_platform::default_binding();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut hotkey = klar_platform::hotkey();
+    hotkey.register(
+        &binding,
+        Box::new(move |event| {
+            let _ = tx.send(event);
+        }),
+    )?;
+
+    println!("ready. hold {binding:?}, speak, release. Ctrl+C to stop.");
+
+    let options = TranscribeOptions {
+        language: args.language.clone(),
+        ..TranscribeOptions::default()
+    };
+
+    let mut session: Option<Session> = None;
+
+    loop {
+        // Keep draining while recording, so nothing is lost between events.
+        if let Some(active) = session.as_mut()
+            && active.pump().is_err()
+        {
+            println!("capture stopped unexpectedly");
+            session = None;
+        }
+
+        // A stuck key must not record forever.
+        if let Some(active) = &session
+            && active.started.elapsed().as_secs_f32() > args.max_seconds
+        {
+            println!("hit the {:.0}s limit; stopping", args.max_seconds);
+            let finished = session.take().unwrap_or_else(|| unreachable!());
+            finish(
+                finished,
+                &mut transcriber,
+                &options,
+                &mut *injector,
+                args.dry,
+            )?;
+        }
+
+        match rx.recv_timeout(Duration::from_millis(20)) {
+            Ok(HotkeyEvent::Pressed) => {
+                if session.is_some() {
+                    continue;
+                }
+                match Session::start(args.device.as_deref()) {
+                    Ok(started) => {
+                        println!("\nlistening ...");
+                        session = Some(started);
+                    }
+                    Err(error) => println!("could not open the microphone: {error}"),
+                }
+            }
+            Ok(HotkeyEvent::Released) => {
+                if let Some(finished) = session.take() {
+                    finish(
+                        finished,
+                        &mut transcriber,
+                        &options,
+                        &mut *injector,
+                        args.dry,
+                    )?;
+                }
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+
+    Ok(())
+}
+
+/// One in-flight dictation.
+struct Session {
+    capture: Capture,
+    audio: std::sync::mpsc::Receiver<Vec<f32>>,
+    raw: Vec<f32>,
+    started: Instant,
+}
+
+impl Session {
+    fn start(device: Option<&str>) -> Result<Self> {
+        let config = CaptureConfig {
+            device: device.map(str::to_owned),
+        };
+        let (capture, audio) = Capture::start(&config)?;
+        Ok(Self {
+            capture,
+            audio,
+            raw: Vec::new(),
+            started: Instant::now(),
+        })
+    }
+
+    fn pump(&mut self) -> Result<()> {
+        match audio::capture::drain(&self.audio, &mut self.raw) {
+            Some(()) => Ok(()),
+            None => bail!("capture disconnected"),
+        }
+    }
+}
+
+/// Everything after the key comes up: finalise, transcribe, inject.
+///
+/// This is the path the latency budget in CLAUDE.md applies to, so each stage
+/// is timed separately.
+fn finish(
+    mut session: Session,
+    transcriber: &mut WhisperTranscriber,
+    options: &TranscribeOptions,
+    injector: &mut dyn klar_platform::TextInjector,
+    dry: bool,
+) -> Result<()> {
+    let released = Instant::now();
+    let _ = session.pump();
+    let format = session.capture.format();
+    let raw = std::mem::take(&mut session.raw);
+    session.capture.stop();
+
+    if raw.is_empty() {
+        println!("no audio captured");
+        return Ok(());
+    }
+
+    let samples = audio::to_whisper_input(&raw, format)?;
+    if audio::peak(&samples) < 0.01 {
+        println!("silence — nothing to transcribe");
+        return Ok(());
+    }
+
+    let transcript = transcriber.transcribe(&samples, options)?;
+    if transcript.text.is_empty() {
+        println!("no speech recognised");
+        return Ok(());
+    }
+
+    println!("{}", transcript.text);
+
+    if dry {
+        println!(
+            "  transcribe {} ms   (not injected)",
+            transcript.elapsed.as_millis()
+        );
+        return Ok(());
+    }
+
+    let inject_started = Instant::now();
+    let method = injector.inject(&transcript.text)?;
+    let inject_ms = inject_started.elapsed().as_millis();
+
+    println!(
+        "  transcribe {} ms   inject {} ms ({method:?})   key-up to text {} ms",
+        transcript.elapsed.as_millis(),
+        inject_ms,
+        released.elapsed().as_millis()
+    );
     Ok(())
 }
 

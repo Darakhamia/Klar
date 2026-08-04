@@ -7,6 +7,54 @@ Newest first.
 
 ---
 
+## M2 — hotkey and injection
+
+### The hook callback is on the system's critical path
+
+`WH_KEYBOARD_LL` callbacks run on the thread that installed the hook, and while
+one is running *no keystroke on the machine is delivered to anybody*. Windows
+enforces this with `LowLevelHooksTimeout` (300 ms by default): exceed it and the
+hook is silently removed — no error, the hotkey simply stops working.
+
+So the callback compares a virtual key, reads modifier state, and pushes onto a
+channel. Nothing else. The caller's closure runs on a separate dispatch thread.
+For the same reason it uses `try_borrow_mut` rather than `borrow_mut`: a panic
+would unwind into a Windows callback, which is undefined behaviour.
+
+### Key repeat, and releasing the modifier first
+
+Holding a key produces a stream of `WM_KEYDOWN`, so the hook tracks whether it
+is already in a hold and reports only the first. On the way up it deliberately
+does *not* check modifiers — releasing Ctrl a moment before Space is normal, and
+the dictation still has to end.
+
+The trigger is swallowed (return 1) only when the full binding matched, so
+dictating into an editor does not also type a space into it. An unmatched Space
+is passed through, which matters rather a lot.
+
+### Restoring the clipboard is best-effort, and says so
+
+`GetClipboardData` hands back a handle the clipboard owns. For most formats that
+handle is global memory and can be copied; for `CF_BITMAP` and anything the
+owner renders on demand it is not, and `GlobalSize` returning 0 is how we tell.
+Those formats cannot be restored. `Snapshot::is_complete` reports it rather than
+letting the user find out, and the app should surface it.
+
+The restore itself runs on a background thread after 150 ms: the paste is
+asynchronous, and taking the clipboard back before the target has read it would
+paste the user's old contents instead of their dictation.
+
+### Elevation
+
+`OpenProcess` with `PROCESS_QUERY_LIMITED_INFORMATION` failing with
+`ERROR_ACCESS_DENIED` already answers the question — a medium-integrity process
+cannot query an elevated one. Where it succeeds, the integrity levels are
+compared directly via the token's mandatory label. Unknown is treated as "try
+anyway": refusing to dictate on a maybe would be worse than a paste that does
+not land.
+
+---
+
 ## M1 — speech to text
 
 ### Measured, on the target machine

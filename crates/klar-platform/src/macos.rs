@@ -54,4 +54,12 @@ impl TextInjector for MacInjector {
     fn inject(&mut self, _text: &str) -> Result<InjectionMethod, PlatformError> {
         Err(PlatformError::NotImplemented("NSPasteboard injection"))
     }
+
+    fn inject_using(
+        &mut self,
+        _text: &str,
+        _method: InjectionMethod,
+    ) -> Result<InjectionMethod, PlatformError> {
+        Err(PlatformError::NotImplemented("NSPasteboard injection"))
+    }
 }

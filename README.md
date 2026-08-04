@@ -13,6 +13,12 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
+**M2 in review — hold to talk.** The `WH_KEYBOARD_LL` hook, clipboard
+injection with save and restore, the keystroke fallback and elevation detection
+are written and compile for Windows; `klar-cli dictate` runs the whole loop.
+Not yet manually tested across applications, which is what M2's criterion asks
+for.
+
 **M1 passed on Windows.** Capture, resampling, model download and whisper.cpp
 work from `klar-cli` on a real machine: 9.98 s of speech transcribed in 320 ms
 on CUDA, against a criterion of one second. See `docs/platform-notes.md` for the
@@ -82,6 +88,19 @@ cargo run -p klar-cli --features cuda -- listen --seconds 5
 
 `doctor` prints the backend and `listen` prints the real-time factor, so a
 build that quietly fell back to CPU is visible immediately rather than at M3.
+
+### Hold to talk
+
+```sh
+cargo run -p klar-cli --features cuda -- hotkey     # does the hook see both edges?
+cargo run -p klar-cli --features cuda -- inject "hello" --delay 3
+cargo run -p klar-cli --features cuda -- dictate    # the whole loop
+```
+
+`dictate` loads the model once, then waits: hold Ctrl+Space anywhere, speak,
+release, and the text lands at the cursor in whatever is focused. It prints the
+time from key-up to inserted text, which is the number CLAUDE.md's budget is
+about.
 
 Other commands: `devices`, `record --seconds 5 --out debug.wav`,
 `transcribe file.wav`, `model list|verify`, `dry-run`.

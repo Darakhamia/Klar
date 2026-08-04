@@ -19,9 +19,21 @@ pub enum InjectionMethod {
 }
 
 pub trait TextInjector: Send {
-    /// Insert `text` at the cursor in the focused application.
+    /// Insert `text` at the cursor in the focused application, choosing the
+    /// method.
     ///
     /// Implementations must restore the previous clipboard contents whether they
     /// succeed or fail.
     fn inject(&mut self, text: &str) -> Result<InjectionMethod, PlatformError>;
+
+    /// Insert `text` using a specific method.
+    ///
+    /// Some applications refuse a programmatic paste, and the only way to know
+    /// is to try. This is what the per-application override in settings sets,
+    /// and what `klar-cli inject --method keystrokes` exercises.
+    fn inject_using(
+        &mut self,
+        text: &str,
+        method: InjectionMethod,
+    ) -> Result<InjectionMethod, PlatformError>;
 }
