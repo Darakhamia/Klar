@@ -56,6 +56,25 @@ Note that a CPU build exercises everything in M1 except the latency budget, so
 capture, model download and transcription accuracy can all be verified while
 the toolkit downloads.
 
+### cpal 0.18.1 can resolve itself into a build failure on Windows
+
+cpal declares `windows` and `windows-core` as two *independent* version ranges,
+both `>=0.61, <=0.62`. Either matched pair compiles. The mix does not — and
+cargo is free to pick `windows 0.61.3`, which carries `windows-core 0.61.2`,
+alongside a separate `windows-core 0.62.2`. Two `windows_core` crates in one
+graph, and cpal's own `#[windows::core::implement]` macro then fails with
+eighteen errors about "multiple different versions of crate `windows_core`",
+none of which mention cpal's manifest.
+
+`klar-core` now names both crates in a `cfg(target_os = "windows")` dependency
+block to hold them to one major. They are not used directly; the block exists
+only so the resolver cannot roll the broken combination. Verified by deleting
+`Cargo.lock`, resolving from scratch and running `cargo check -p cpal --target
+x86_64-pc-windows-msvc`.
+
+Worth knowing that a committed `Cargo.lock` is not protection here: ours had the
+broken mix in it, which is how it reached a developer machine.
+
 ### Linux needs ALSA headers
 
 `cpal` will not build without `libasound2-dev`. Linux is not a target, but the

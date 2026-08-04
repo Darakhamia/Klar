@@ -41,6 +41,22 @@ sha2 = "0.11.0"
 hex = "0.4.3"
 directories.workspace = true
 
+# Not used directly — these exist to constrain cpal.
+#
+# cpal 0.18.1 declares `windows` and `windows-core` as two independent
+# `>=0.61, <=0.62` ranges. Either pair works; the mix does not. Cargo is free to
+# resolve `windows 0.61.3` (which carries windows-core 0.61.2) alongside a
+# separate `windows-core 0.62.2`, which puts two `windows_core` crates in one
+# graph and makes cpal's own `#[implement]` macro fail to compile with a wall of
+# "multiple different versions of crate windows_core".
+#
+# Naming both here forces them to the same major, so the resolver cannot roll
+# the broken combination again. Drop this block once cpal ships a manifest that
+# keeps the two in step.
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = "0.62"
+windows-core = "0.62"
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt", "macros"] }
 
