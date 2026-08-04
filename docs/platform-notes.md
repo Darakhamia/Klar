@@ -56,21 +56,26 @@ Note that a CPU build exercises everything in M1 except the latency budget, so
 capture, model download and transcription accuracy can all be verified while
 the toolkit downloads.
 
-### Three build prerequisites, none of which name themselves
+### Four build prerequisites, none of which name themselves
 
-Building `whisper-rs` on Windows needs three things beyond the Rust toolchain,
+Building `whisper-rs` on Windows needs four things beyond the Rust toolchain,
 and each one missing fails in a way that does not mention what is missing:
 
 | Missing | What you see |
 |---|---|
 | CUDA Toolkit | `called \`Result::unwrap()\` on an \`Err\` value: NotPresent` from `whisper-rs-sys/build.rs:59` — that is `env::var("CUDA_PATH")` |
 | LLVM | `Unable to find libclang` from `bindgen`, which generates the whisper.cpp bindings |
-| MSVC Build Tools | link errors, or CMake not found |
+| CMake | `failed to execute command: program not found` from `cmake-0.1.58` |
+| MSVC Build Tools | link errors |
 
-They surface one at a time, so the first two look like the whole problem. The
-README now lists all three up front. Note that installing any of them does not
-help the shell you are already in — the environment variables only reach new
-processes.
+They surface strictly one at a time — each fix reveals the next — so the first
+looks like the whole problem. The README now lists all four up front.
+
+Two things worth knowing. Installing any of them does not help the shell you are
+already in: the environment variables only reach new processes. And Visual
+Studio's C++ workload *does* ship CMake, but under
+`Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin` rather than on
+`PATH`, so cargo cannot see it — install CMake standalone.
 
 ### cpal 0.18.1 can resolve itself into a build failure on Windows
 
