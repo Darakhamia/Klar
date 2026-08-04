@@ -19,6 +19,15 @@ use whisper_rs::{
 
 static LOGGING_HOOKS: Once = Once::new();
 
+/// Route whisper.cpp's and ggml's own logs into `tracing`.
+///
+/// Must happen before any whisper.cpp context is created, or that context
+/// writes straight to stderr where no filter can reach it. Both the ASR and the
+/// VAD call this, since either can be the first one loaded.
+pub fn install_logging_hooks() {
+    LOGGING_HOOKS.call_once(whisper_rs::install_logging_hooks);
+}
+
 pub struct WhisperTranscriber {
     state: WhisperState,
     backend: Backend,
@@ -32,10 +41,10 @@ pub struct WhisperTranscriber {
 impl WhisperTranscriber {
     /// Load a model and report, loudly, what we are running on.
     pub fn load(model: &Path) -> Result<Self, AsrError> {
-        // Send whisper.cpp's and ggml's own logs — including the device
-        // registration lines that are the only runtime proof a GPU was picked
-        // up — into tracing, so they land in Klar's log file.
-        LOGGING_HOOKS.call_once(whisper_rs::install_logging_hooks);
+        // Their own logs — including the device registration lines that are
+        // the only runtime proof a GPU was picked up — belong in Klar's log
+        // file, not on stderr.
+        install_logging_hooks();
 
         if !model.is_file() {
             return Err(AsrError::ModelMissing(model.to_path_buf()));

@@ -57,6 +57,34 @@ doubles the model work and removes the accuracy cliff at block boundaries.
 Measured against the one-shot detector on the same speech: same four segments,
 boundaries within 40-160 ms, about 5% of real time on CPU.
 
+### The quadratic cost came back through the side door
+
+`advance` was careful to analyse each second exactly once. Then every partial
+called `trim`, which is the one-shot detector, which re-runs the model over the
+whole pending buffer — putting back precisely the cost that had just been
+designed out. Visible in the log as `whisper_vad_segments_from_samples:
+detecting speech timestamps in 37504 samples` on every refresh.
+
+`StreamingVad::speech` cuts the speech out using the probabilities already
+stored, with no model run at all. The one-shot detector survives in exactly one
+place: the final tail, which includes the last second `advance` has not analysed
+yet, and which runs once per dictation over a couple of seconds.
+
+Worth remembering that a careful optimisation is only as good as everything else
+on the same path.
+
+### whisper.cpp narrates every VAD call
+
+At info level, once per push. It buries every other line in the log the moment
+streaming starts. The default filter demotes `whisper_rs::whisper_logging_hook`
+to warn while leaving `ggml_logging_hook` alone, because `ggml_cuda_init: found
+1 CUDA devices` is the only runtime proof the GPU was picked up.
+
+The hooks also have to be installed before *any* whisper.cpp context exists —
+including the VAD's. A context created first writes straight to stderr, where no
+filter can reach it, which is why both `WhisperTranscriber::load` and
+`Vad::load` install them.
+
 ### Committing at pauses, not at window edges
 
 Whisper is much better on a complete phrase than on an arbitrary slice, so the

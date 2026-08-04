@@ -160,6 +160,10 @@ impl<'a> Stream<'a> {
         let started = Instant::now();
         self.stats.tail_audio = samples_to_duration(self.pending.len());
 
+        // The one place the one-shot detector is still right: the tail includes
+        // the last second, which `advance` has not analysed yet. It runs once
+        // per dictation over a couple of seconds, not once per partial over
+        // everything.
         let tail = self.vad.inner().trim(&self.pending)?;
         if !tail.is_empty() {
             let transcript = self.transcriber.transcribe(&tail, &self.options)?;
@@ -217,13 +221,14 @@ impl<'a> Stream<'a> {
     /// drop that audio.
     fn commit(&mut self, split: usize) -> Result<Update, AsrError> {
         let split = split.min(self.pending.len());
-        let head: Vec<f32> = self.pending[..split].to_vec();
+        // Take the speech before dropping the audio and the probabilities that
+        // describe it.
+        let speech = self.vad.speech(&self.pending, split);
+        let head_len = split;
         self.pending.drain(..split);
         self.vad.drain(split);
-
-        let speech = self.vad.inner().trim(&head)?;
         self.stats.commits += 1;
-        self.stats.committed_audio += samples_to_duration(head.len());
+        self.stats.committed_audio += samples_to_duration(head_len);
 
         if !speech.is_empty() {
             let transcript = self.transcriber.transcribe(&speech, &self.options)?;
@@ -243,7 +248,7 @@ impl<'a> Stream<'a> {
     fn refresh_partial(&mut self) -> Result<Option<Update>, AsrError> {
         self.last_partial = Instant::now();
 
-        let speech = self.vad.inner().trim(&self.pending)?;
+        let speech = self.vad.speech(&self.pending, self.pending.len());
         if speech.is_empty() {
             return Ok(None);
         }

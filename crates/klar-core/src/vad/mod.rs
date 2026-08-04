@@ -92,6 +92,9 @@ impl Vad {
     /// model is under a megabyte and costs a few percent of real time on the
     /// CPU, so this is not a loss worth chasing.
     pub fn load(model: &Path, settings: VadSettings) -> Result<Self, AsrError> {
+        // Before the context exists, or whisper.cpp logs past every filter.
+        crate::asr::whisper::install_logging_hooks();
+
         if !model.is_file() {
             return Err(AsrError::ModelMissing(model.to_path_buf()));
         }
@@ -276,6 +279,27 @@ impl StreamingVad {
     pub fn trailing_silence(&self) -> Option<Duration> {
         let last = self.segments().last().copied()?;
         Some(samples_to_duration(self.analysed.saturating_sub(last.end)))
+    }
+
+    /// Keep only the speech in `buffer[..end]`, using the probabilities already
+    /// computed.
+    ///
+    /// No model run at all — this is why the analysis is kept. Calling the
+    /// one-shot `trim` here instead would re-detect over the whole buffer on
+    /// every partial and put back exactly the cost [`advance`] exists to avoid.
+    ///
+    /// [`advance`]: Self::advance
+    pub fn speech(&self, buffer: &[f32], end: usize) -> Vec<f32> {
+        let end = end.min(buffer.len()).min(self.analysed);
+        let mut kept = Vec::new();
+        for segment in self.segments() {
+            let start = segment.start.min(end);
+            let stop = segment.end.min(end);
+            if start < stop {
+                kept.extend_from_slice(&buffer[start..stop]);
+            }
+        }
+        kept
     }
 
     /// The underlying detector, for the one-shot calls that finalisation makes.

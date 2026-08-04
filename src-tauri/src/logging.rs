@@ -6,10 +6,18 @@
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
+/// whisper.cpp narrates every VAD call at info level, which buries everything
+/// else once streaming starts. Its own logs are demoted; ggml's are not,
+/// because `ggml_cuda_init: found 1 CUDA devices` is the only runtime proof
+/// that the GPU was actually picked up. Raise it with
+/// `KLAR_LOG=info,whisper_rs=info` when that is what you are looking at.
+const DEFAULT_LOG: &str = "info,whisper_rs::whisper_logging_hook=warn";
+
 /// Install the subscriber. The returned guard flushes the file writer on drop,
 /// so callers must hold it for the lifetime of the process.
 pub fn init() -> Option<WorkerGuard> {
-    let filter = EnvFilter::try_from_env("KLAR_LOG").unwrap_or_else(|_| EnvFilter::new("info"));
+    let filter =
+        EnvFilter::try_from_env("KLAR_LOG").unwrap_or_else(|_| EnvFilter::new(DEFAULT_LOG));
 
     let Some(dir) = log_dir() else {
         tracing_subscriber::registry()

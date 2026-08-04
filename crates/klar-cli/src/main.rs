@@ -172,12 +172,19 @@ enum ModelCommand {
     Path,
 }
 
+/// whisper.cpp narrates every VAD call at info level, which buries everything
+/// else once streaming starts. Its own logs are demoted; ggml's are not,
+/// because `ggml_cuda_init: found 1 CUDA devices` is the only runtime proof
+/// that the GPU was actually picked up. Raise it with
+/// `KLAR_LOG=info,whisper_rs=info` when that is what you are looking at.
+const DEFAULT_LOG: &str = "info,whisper_rs::whisper_logging_hook=warn";
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_env("KLAR_LOG")
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new(DEFAULT_LOG)),
         )
         .init();
 
