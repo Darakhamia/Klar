@@ -37,7 +37,9 @@ If a design choice makes the app prettier or more general but blows this budget,
 - **Shell:** Tauri v2 — Rust backend, web frontend. Chosen over Electron because the app is resident all day and must stay under ~40 MB RSS.
 - **Frontend:** React + TypeScript + Vite. Settings, onboarding, dictionary, history, stats only. No business logic in the frontend.
 - **Audio capture:** `cpal`, resampled to 16 kHz mono with `rubato`.
-- **VAD:** Silero via the `voice_activity_detector` crate (ONNX).
+- **VAD:** Silero, through whisper.cpp's own VAD rather than a separate ONNX
+  runtime — same ggml backend, no second inference stack in the installer. See
+  `docs/platform-notes.md`.
 - **ASR:** `whisper-rs` (bindings to whisper.cpp). `metal` + `coreml` features on macOS, `cuda` on Windows, CPU fallback everywhere. Model: `large-v3-turbo`, q5_0.
 - **Polish:** trait-based. Local Ollama over HTTP first; cloud (Groq) behind the same trait.
 - **Storage:** `rusqlite` with the `bundled` feature.

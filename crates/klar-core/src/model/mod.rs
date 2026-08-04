@@ -30,6 +30,10 @@ impl ModelSpec {
     }
 }
 
+/// The Silero model whisper.cpp's VAD needs. Small, and required for the
+/// streaming pass rather than optional.
+pub const VAD_MODEL: &str = "silero-vad";
+
 /// The default: quantised large-v3-turbo. Multilingual, and the quality/latency
 /// point the 400 ms transcription budget was set against.
 pub const DEFAULT_MODEL: &str = "large-v3-turbo-q5_0";
@@ -52,6 +56,15 @@ pub const CATALOGUE: &[ModelSpec] = &[
         bytes: 1_624_555_275,
         multilingual: true,
         summary: "Unquantised. Marginally better, three times the memory.",
+    },
+    ModelSpec {
+        id: "silero-vad",
+        file_name: "ggml-silero-v5.1.2.bin",
+        url: "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin",
+        sha256: "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf",
+        bytes: 885_098,
+        multilingual: true,
+        summary: "Voice activity detection. Needed for streaming; not a speech model.",
     },
     ModelSpec {
         id: "tiny.en",

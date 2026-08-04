@@ -13,6 +13,8 @@ pub mod asr;
 pub mod audio;
 pub mod model;
 pub mod state;
+pub mod stream;
+pub mod vad;
 
 pub use state::{IllegalTransition, Input, Machine, State, StateEvent};
 

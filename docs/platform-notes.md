@@ -7,6 +7,55 @@ Newest first.
 
 ---
 
+## M3 — streaming
+
+### Silero without a second inference runtime
+
+CLAUDE.md called for the `voice_activity_detector` crate. It pulls `ort`, which
+is ONNX Runtime: a build-time binary download, another ~15 MB library in the
+installer, and one more thing to sign at M7 — all to run a model of under a
+megabyte.
+
+whisper.cpp 1.8 ships Silero itself, and whisper-rs 0.16 exposes it. Same ggml
+backend that is already initialised, so it runs on CUDA alongside the ASR, and
+the model is 885 KB. The stack line in CLAUDE.md now says so.
+
+### The obvious VAD loop is quadratic
+
+`segments_from_samples` re-runs the model over everything it is given: 231 ms
+for an 11-second buffer on CPU. Calling that on each 20 ms capture callback —
+which is what the natural implementation does — costs more every second and is
+unusable well before a dictation ends.
+
+`StreamingVad` analyses each second of audio exactly once and keeps the
+per-frame probabilities Silero produces (one per 512 samples, so 32 ms each).
+Segmentation afterwards is arithmetic over that track, which also means the
+rules deciding where a phrase ends are plain Rust and directly testable.
+
+`detect_speech` resets Silero's recurrent state on every call, so each block is
+analysed with a second of already-seen audio in front of it as warm-up. That
+doubles the model work and removes the accuracy cliff at block boundaries.
+Measured against the one-shot detector on the same speech: same four segments,
+boundaries within 40-160 ms, about 5% of real time on CPU.
+
+### Committing at pauses, not at window edges
+
+Whisper is much better on a complete phrase than on an arbitrary slice, so the
+commit boundary is a pause the VAD found. That also avoids stitching
+overlapping windows token by token, which is where streaming ASR usually goes
+wrong. A speaker who never pauses is committed anyway at 15 s, before whisper's
+30-second encoder window starts to matter.
+
+### Resampling cannot be done per callback
+
+The resampler is constructed per call, so converting each 20 ms callback
+separately leaves a discontinuity at every boundary; converting the whole
+buffer again each time is quadratic. `BlockConverter` holds the leftover raw
+samples and converts once 250 ms have arrived, always on whole frames so the
+channels stay aligned.
+
+---
+
 ## M2 — hotkey and injection
 
 ### Passed on Windows

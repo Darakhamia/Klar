@@ -8,6 +8,8 @@ use clap::{Parser, Subcommand};
 use klar_core::asr::{Backend, TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
+use klar_core::stream::{Stream, StreamConfig, StreamStats, Update};
+use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine};
 use klar_platform::{HotkeyEvent, InjectionMethod};
 use std::io::Write;
@@ -46,6 +48,8 @@ enum Command {
     /// Hold the hotkey, speak, release, and the text lands in the focused app.
     /// The M2 acceptance criterion end to end.
     Dictate(DictateArgs),
+    /// Show what the voice activity detector finds in a wav file.
+    Vad(VadArgs),
     /// Manage the whisper models.
     #[command(subcommand)]
     Model(ModelCommand),
@@ -90,6 +94,21 @@ struct ListenArgs {
     model: String,
     #[arg(long)]
     language: Option<String>,
+}
+
+#[derive(clap::Args)]
+struct VadArgs {
+    file: PathBuf,
+    /// Silero's probability threshold, 0..1.
+    #[arg(long, default_value_t = 0.5)]
+    threshold: f32,
+    /// Silence shorter than this is a gap within a sentence, in milliseconds.
+    #[arg(long, default_value_t = 400)]
+    min_silence: u64,
+    /// Also run the incremental detector the streaming pass uses, feeding the
+    /// file through in chunks, and compare the two.
+    #[arg(long)]
+    stream: bool,
 }
 
 #[derive(clap::Args)]
@@ -169,6 +188,7 @@ async fn main() -> Result<()> {
         Command::Record(args) => record(&args),
         Command::Transcribe(args) => transcribe(&args),
         Command::Listen(args) => listen(&args),
+        Command::Vad(args) => vad(&args),
         Command::Inject(args) => inject(&args),
         Command::Hotkey => hotkey(),
         Command::Dictate(args) => dictate(&args),
@@ -424,6 +444,113 @@ fn run_asr(samples: &[f32], model_id: &str, language: Option<&str>) -> Result<()
     Ok(())
 }
 
+/// Report the speech the detector finds, and what trimming would save.
+fn vad(args: &VadArgs) -> Result<()> {
+    let samples = audio::wav::read_as_whisper_input(&args.file)
+        .with_context(|| format!("reading {}", args.file.display()))?;
+
+    let dir = models_dir()?;
+    let spec = model::find(model::VAD_MODEL).context("the vad model is not in the catalogue")?;
+    let path = model::path_in(&dir, spec);
+    if !path.is_file() {
+        bail!("run `klar-cli model download {}` first", spec.id);
+    }
+
+    let settings = VadSettings {
+        threshold: args.threshold,
+        min_silence: Duration::from_millis(args.min_silence),
+        ..VadSettings::default()
+    };
+
+    let started = Instant::now();
+    let mut vad = Vad::load(&path, settings)?;
+    let load = started.elapsed();
+
+    let started = Instant::now();
+    let segments = vad.segments(&samples)?;
+    let elapsed = started.elapsed();
+
+    let total = audio::SAMPLE_RATE as f32;
+    println!("audio         {:.2} s", samples.len() as f32 / total);
+    println!("vad load      {} ms", load.as_millis());
+    println!("vad run       {} ms", elapsed.as_millis());
+    println!("segments      {}", segments.len());
+
+    let mut speech = 0_usize;
+    for (index, segment) in segments.iter().enumerate() {
+        speech += segment.len();
+        println!(
+            "  {index:>2}  {:>6.2} → {:>6.2} s   ({:.2} s)",
+            segment.start as f32 / total,
+            segment.end as f32 / total,
+            segment.duration().as_secs_f32()
+        );
+    }
+
+    if samples.is_empty() {
+        return Ok(());
+    }
+    let kept = speech as f32 / samples.len() as f32 * 100.0;
+    println!(
+        "speech        {kept:.0}% of the buffer — trimming saves {:.0}%",
+        100.0 - kept
+    );
+
+    if args.stream {
+        compare_streaming(vad, &samples, &segments)?;
+    }
+    Ok(())
+}
+
+/// Feed the same audio through the incremental detector in capture-sized
+/// chunks and show what it found.
+///
+/// The streaming path analyses each second once and segments from stored
+/// probabilities; the one-shot path re-runs the model over everything. They
+/// should agree, and this is where that is checked against real speech rather
+/// than a synthetic probability track.
+fn compare_streaming(
+    vad: Vad,
+    samples: &[f32],
+    one_shot: &[klar_core::vad::Segment],
+) -> Result<()> {
+    use klar_core::vad::StreamingVad;
+
+    let mut streaming = StreamingVad::new(vad);
+    let started = Instant::now();
+
+    // 20 ms at a time, as the capture callback delivers.
+    let chunk = audio::SAMPLE_RATE as usize / 50;
+    let mut fed = 0;
+    while fed < samples.len() {
+        let end = (fed + chunk).min(samples.len());
+        streaming.advance(&samples[..end])?;
+        fed = end;
+    }
+
+    let found = streaming.segments();
+    let total = audio::SAMPLE_RATE as f32;
+
+    println!();
+    println!(
+        "streaming     {} ms for the whole file, in 20 ms pushes",
+        started.elapsed().as_millis()
+    );
+    println!(
+        "segments      {} (one-shot found {})",
+        found.len(),
+        one_shot.len()
+    );
+    for (index, segment) in found.iter().enumerate() {
+        println!(
+            "  {index:>2}  {:>6.2} → {:>6.2} s",
+            segment.start as f32 / total,
+            segment.end as f32 / total
+        );
+    }
+    Ok(())
+}
+
 /// Insert text into the focused window. The delay exists because the terminal
 /// is focused when you press Enter, and typing into it proves nothing.
 fn inject(args: &InjectArgs) -> Result<()> {
@@ -478,10 +605,15 @@ fn hotkey() -> Result<()> {
 }
 
 /// The whole thing: hold the hotkey, speak, release, text appears.
+///
+/// Transcription runs while the user is still talking, so key release only
+/// leaves the tail — the last phrase since their final pause.
 fn dictate(args: &DictateArgs) -> Result<()> {
+    let dir = models_dir()?;
+
     let spec = model::find(&args.model)
         .with_context(|| format!("unknown model '{}' — try `klar-cli model list`", args.model))?;
-    let path = model::path_in(&models_dir()?, spec);
+    let path = model::path_in(&dir, spec);
     if !path.is_file() {
         bail!(
             "{} is not installed — run `klar-cli model download {}`",
@@ -490,11 +622,18 @@ fn dictate(args: &DictateArgs) -> Result<()> {
         );
     }
 
-    // The model is loaded once and stays resident. Loading it after the user has
-    // started speaking would lose the beginning of the sentence — the reason
-    // M3 keeps it in memory too.
+    let vad_spec =
+        model::find(model::VAD_MODEL).context("the vad model is not in the catalogue")?;
+    let vad_path = model::path_in(&dir, vad_spec);
+    if !vad_path.is_file() {
+        bail!("run `klar-cli model download {}` first", vad_spec.id);
+    }
+
+    // Both models load once and stay resident. Loading either after the user
+    // has started speaking would lose the beginning of the sentence.
     println!("loading {} ...", spec.id);
     let mut transcriber = WhisperTranscriber::load(&path)?;
+    let mut vad = StreamingVad::new(Vad::load(&vad_path, VadSettings::default())?);
     let mut injector = klar_platform::injector();
 
     let binding = klar_platform::default_binding();
@@ -513,102 +652,109 @@ fn dictate(args: &DictateArgs) -> Result<()> {
         language: args.language.clone(),
         ..TranscribeOptions::default()
     };
-
-    let mut session: Option<Session> = None;
+    let config = StreamConfig::default();
     let mut timings = Timings::default();
 
     loop {
-        // Keep draining while recording, so nothing is lost between events.
-        if let Some(active) = session.as_mut()
-            && active.pump().is_err()
-        {
-            println!("capture stopped unexpectedly");
-            session = None;
+        // Idle until the key goes down. A stray release here is nothing.
+        match rx.recv() {
+            Ok(HotkeyEvent::Pressed) => {}
+            Ok(HotkeyEvent::Released) => continue,
+            Err(_) => break,
         }
 
-        // A stuck key must not record forever.
-        if let Some(active) = &session
-            && active.started.elapsed().as_secs_f32() > args.max_seconds
-        {
-            println!("hit the {:.0}s limit; stopping", args.max_seconds);
-            let finished = session.take().unwrap_or_else(|| unreachable!());
-            finish(
-                finished,
-                &mut transcriber,
-                &options,
-                &mut *injector,
-                args.dry,
-                &mut timings,
-            )?;
-        }
+        let capture_config = CaptureConfig {
+            device: args.device.as_deref().map(str::to_owned),
+        };
+        let (capture, audio_rx) = match Capture::start(&capture_config) {
+            Ok(started) => started,
+            Err(error) => {
+                println!("could not open the microphone: {error}");
+                continue;
+            }
+        };
 
-        match rx.recv_timeout(Duration::from_millis(20)) {
-            Ok(HotkeyEvent::Pressed) => {
-                if session.is_some() {
-                    continue;
-                }
-                match Session::start(args.device.as_deref()) {
-                    Ok(started) => {
-                        println!("\nlistening ...");
-                        session = Some(started);
+        println!("\nlistening ...");
+        let mut converter =
+            audio::BlockConverter::new(capture.format(), Duration::from_millis(250));
+        let mut stream = Stream::new(&mut transcriber, &mut vad, options.clone(), config);
+        let started = Instant::now();
+        let mut raw = Vec::new();
+        let mut shown = String::new();
+
+        // Recognise as it arrives, until the key comes up.
+        let released = loop {
+            raw.clear();
+            if audio::capture::drain(&audio_rx, &mut raw).is_none() {
+                println!("capture stopped unexpectedly");
+                break None;
+            }
+            if !raw.is_empty() {
+                let block = converter.push(&raw)?;
+                if !block.is_empty()
+                    && let Some(update) = stream.push(&block)?
+                {
+                    let text = match &update {
+                        Update::Partial(text) | Update::Committed(text) => text,
+                    };
+                    if *text != shown {
+                        shown.clone_from(text);
+                        print!("\r{:<78}", truncate(text, 78));
+                        std::io::stdout().flush().ok();
                     }
-                    Err(error) => println!("could not open the microphone: {error}"),
                 }
             }
-            Ok(HotkeyEvent::Released) => {
-                if let Some(finished) = session.take() {
-                    finish(
-                        finished,
-                        &mut transcriber,
-                        &options,
-                        &mut *injector,
-                        args.dry,
-                        &mut timings,
-                    )?;
-                }
+
+            if started.elapsed().as_secs_f32() > args.max_seconds {
+                println!("\nhit the {:.0}s limit; stopping", args.max_seconds);
+                break Some(Instant::now());
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+
+            match rx.recv_timeout(Duration::from_millis(20)) {
+                Ok(HotkeyEvent::Released) => break Some(Instant::now()),
+                Ok(HotkeyEvent::Pressed) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break None,
+            }
+        };
+
+        // Anything the converter was still holding belongs to this dictation.
+        let tail = converter.flush()?;
+        if !tail.is_empty() {
+            stream.push(&tail)?;
         }
+        capture.stop();
+
+        let (text, stats) = stream.finish()?;
+        print!("\r{:<78}\r", "");
+
+        let Some(released) = released else { break };
+
+        if text.is_empty() {
+            println!("no speech recognised");
+            continue;
+        }
+
+        println!("{text}");
+
+        if args.dry {
+            report(&stats, None, released, &mut timings);
+            continue;
+        }
+
+        let inject_started = Instant::now();
+        let method = injector.inject(&text)?;
+        report(
+            &stats,
+            Some((method, inject_started.elapsed())),
+            released,
+            &mut timings,
+        );
     }
 
     Ok(())
 }
 
-/// One in-flight dictation.
-struct Session {
-    capture: Capture,
-    audio: std::sync::mpsc::Receiver<Vec<f32>>,
-    raw: Vec<f32>,
-    started: Instant,
-}
-
-impl Session {
-    fn start(device: Option<&str>) -> Result<Self> {
-        let config = CaptureConfig {
-            device: device.map(str::to_owned),
-        };
-        let (capture, audio) = Capture::start(&config)?;
-        Ok(Self {
-            capture,
-            audio,
-            raw: Vec::new(),
-            started: Instant::now(),
-        })
-    }
-
-    fn pump(&mut self) -> Result<()> {
-        match audio::capture::drain(&self.audio, &mut self.raw) {
-            Some(()) => Ok(()),
-            None => bail!("capture disconnected"),
-        }
-    }
-}
-
-/// Everything after the key comes up: finalise, transcribe, inject.
-///
-/// This is the path the latency budget in CLAUDE.md applies to, so each stage
-/// is timed separately.
 /// Key-up-to-text, one entry per dictation.
 ///
 /// M3's criterion is a median over at least twenty real dictations, so the
@@ -640,60 +786,38 @@ impl Timings {
     }
 }
 
-fn finish(
-    mut session: Session,
-    transcriber: &mut WhisperTranscriber,
-    options: &TranscribeOptions,
-    injector: &mut dyn klar_platform::TextInjector,
-    dry: bool,
+/// Cut a partial to fit one terminal line without splitting a character.
+fn truncate(text: &str, width: usize) -> String {
+    if text.chars().count() <= width {
+        return text.to_owned();
+    }
+    // Keep the end: that is where the newest words are.
+    let skip = text.chars().count() - width + 1;
+    format!("…{}", text.chars().skip(skip).collect::<String>())
+}
+
+fn report(
+    stats: &StreamStats,
+    injected: Option<(InjectionMethod, Duration)>,
+    released: Instant,
     timings: &mut Timings,
-) -> Result<()> {
-    let released = Instant::now();
-    let _ = session.pump();
-    let format = session.capture.format();
-    let raw = std::mem::take(&mut session.raw);
-    session.capture.stop();
-
-    if raw.is_empty() {
-        println!("no audio captured");
-        return Ok(());
-    }
-
-    let samples = audio::to_whisper_input(&raw, format)?;
-    if audio::peak(&samples) < 0.01 {
-        println!("silence — nothing to transcribe");
-        return Ok(());
-    }
-
-    let transcript = transcriber.transcribe(&samples, options)?;
-    if transcript.text.is_empty() {
-        println!("no speech recognised");
-        return Ok(());
-    }
-
-    println!("{}", transcript.text);
-
-    if dry {
-        println!(
-            "  transcribe {} ms   (not injected)",
-            transcript.elapsed.as_millis()
-        );
-        return Ok(());
-    }
-
-    let inject_started = Instant::now();
-    let method = injector.inject(&transcript.text)?;
-    let inject_ms = inject_started.elapsed().as_millis();
-
+) {
     let key_up_to_text = released.elapsed().as_millis();
     timings.record(key_up_to_text);
 
+    let injection = match injected {
+        Some((method, elapsed)) => format!("inject {} ms ({method:?})   ", elapsed.as_millis()),
+        None => "not injected   ".to_owned(),
+    };
+
     println!(
-        "  transcribe {} ms   inject {inject_ms} ms ({method:?})   key-up to text {key_up_to_text} ms{}",
-        transcript.elapsed.as_millis(),
+        "  streamed {:.1}s in {} commit(s)   tail {:.1}s in {} ms   {injection}key-up to text {key_up_to_text} ms{}",
+        stats.committed_audio.as_secs_f32(),
+        stats.commits,
+        stats.tail_audio.as_secs_f32(),
+        stats.tail_elapsed.as_millis(),
         timings.summary()
     );
-    Ok(())
 }
 
 async fn model_command(command: ModelCommand) -> Result<()> {
