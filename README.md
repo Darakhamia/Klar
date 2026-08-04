@@ -31,9 +31,30 @@ design/                the design output the interface is built from
 
 ## Getting started
 
-Requires [Rust](https://rustup.rs) (1.85+), Node 22, and — on Windows —
-[WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (already
-present on Windows 11) plus the MSVC build tools.
+Requires [Rust](https://rustup.rs) (1.85+) and Node 22.
+
+### Windows prerequisites
+
+whisper.cpp is compiled from source and its bindings are generated at build
+time, so more than the Rust toolchain is needed. Install all of these before
+the first build — each one missing produces an error that does not name it.
+
+| What | Why | Install |
+|---|---|---|
+| MSVC Build Tools (Desktop C++) | The compiler and linker; also provides CMake | `winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"` |
+| LLVM | `bindgen` needs `libclang.dll` to generate the whisper.cpp bindings | `winget install LLVM.LLVM` |
+| CUDA Toolkit | Only for `--features cuda`. Blackwell (RTX 50xx) needs 12.8+ | `winget install Nvidia.CUDA` |
+| WebView2 | The Tauri window. Already present on Windows 11 | [Download](https://developer.microsoft.com/microsoft-edge/webview2/) |
+
+Open a new terminal afterwards: `CUDA_PATH` and the LLVM path only reach
+processes started after installation. If `bindgen` still cannot find libclang,
+point it at the install explicitly:
+
+```powershell
+[Environment]::SetEnvironmentVariable("LIBCLANG_PATH", "C:\Program Files\LLVM\bin", "User")
+```
+
+macOS needs Xcode command line tools and CMake (`brew install cmake`).
 
 ```sh
 npm install
