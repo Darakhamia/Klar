@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-8e3f2e58-9960-48cc-8001-18ab32255873/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#f3f2f2; }
+  a { color:var(--color-accent-700); text-decoration:none; }
+  a:hover { color:var(--color-accent); }
+  @keyframes klarBar { 0%,100% { transform:scaleY(0.18); } 50% { transform:scaleY(1); } }
+</style>
+</helmet>
+<div style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); padding:var(--space-8) var(--space-8) 96px; min-height:100vh; -webkit-font-smoothing:antialiased;">
+  <div style="max-width:1120px; margin:0 auto; display:flex; flex-direction:column; gap:var(--space-8);">
+
+    <header style="display:flex; flex-direction:column; gap:var(--space-4); padding-bottom:var(--space-6); border-bottom:2px solid var(--color-text);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-accent-700);">Klar — tokens</div>
+      <h1 style="font-family:var(--font-heading); font-weight:800; font-size:52px; line-height:0.98; letter-spacing:-0.03em; margin:0; max-width:20ch;">Messy speech in, finished text out.</h1>
+      <p style="margin:0; max-width:64ch; font-size:15px; line-height:1.6; color:var(--color-neutral-800); text-wrap:pretty;">Built on the Modernist system: Archivo throughout, zero radius, 2px rules, one red. Klar adds one thing the system did not have — a dark theme, derived from the neutral ramp rather than invented, because this audience runs dark all day.</p>
+    </header>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-6);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">01 — The five named colors</div>
+      <div style="display:grid; grid-template-columns:repeat(5, 1fr); gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6);">
+          <div style="height:88px; background:var(--color-bg); border:2px solid var(--color-text);"></div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:13px; font-weight:700;">Ground</div>
+            <div style="font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--color-neutral-600);">#F3F2F2</div>
+            <div style="font-size:11px; line-height:1.5; color:var(--color-neutral-600);">Light theme page</div>
+          </div>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6);">
+          <div style="height:88px; background:var(--color-text);"></div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:13px; font-weight:700;">Ink</div>
+            <div style="font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--color-neutral-600);">#201E1D</div>
+            <div style="font-size:11px; line-height:1.5; color:var(--color-neutral-600);">Type, rules, dark theme ground</div>
+          </div>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6);">
+          <div style="height:88px; background:var(--color-accent);"></div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:13px; font-weight:700;">Signal</div>
+            <div style="font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--color-neutral-600);">#EC3013</div>
+            <div style="font-size:11px; line-height:1.5; color:var(--color-neutral-600);">Live audio, primary action</div>
+          </div>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6);">
+          <div style="height:88px; background:var(--color-accent-500);"></div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:13px; font-weight:700;">Signal, dark</div>
+            <div style="font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--color-neutral-600);">#FF563C</div>
+            <div style="font-size:11px; line-height:1.5; color:var(--color-neutral-600);">Same role, one ramp step up</div>
+          </div>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-6);">
+          <div style="height:88px; background:var(--color-neutral-500);"></div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:13px; font-weight:700;">Grey</div>
+            <div style="font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--color-neutral-600);">#9B9797</div>
+            <div style="font-size:11px; line-height:1.5; color:var(--color-neutral-600);">Everything not currently live</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-6);">
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Neutral ramp — 100 to 900</div>
+          <div style="display:flex; height:52px; border:2px solid var(--color-text);">
+            <div style="flex:1; background:var(--color-neutral-100);"></div>
+            <div style="flex:1; background:var(--color-neutral-200);"></div>
+            <div style="flex:1; background:var(--color-neutral-300);"></div>
+            <div style="flex:1; background:var(--color-neutral-400);"></div>
+            <div style="flex:1; background:var(--color-neutral-500);"></div>
+            <div style="flex:1; background:var(--color-neutral-600);"></div>
+            <div style="flex:1; background:var(--color-neutral-700);"></div>
+            <div style="flex:1; background:var(--color-neutral-800);"></div>
+            <div style="flex:1; background:var(--color-neutral-900);"></div>
+          </div>
+          <div style="font-size:12px; line-height:1.6; color:var(--color-neutral-700);">The dark theme is steps 900 and 800 as surfaces, 100 as type, 400 as secondary type. Nothing new was mixed.</div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Accent ramp — 100 to 900</div>
+          <div style="display:flex; height:52px; border:2px solid var(--color-text);">
+            <div style="flex:1; background:var(--color-accent-100);"></div>
+            <div style="flex:1; background:var(--color-accent-200);"></div>
+            <div style="flex:1; background:var(--color-accent-300);"></div>
+            <div style="flex:1; background:var(--color-accent-400);"></div>
+            <div style="flex:1; background:var(--color-accent-500);"></div>
+            <div style="flex:1; background:var(--color-accent-600);"></div>
+            <div style="flex:1; background:var(--color-accent-700);"></div>
+            <div style="flex:1; background:var(--color-accent-800);"></div>
+            <div style="flex:1; background:var(--color-accent-900);"></div>
+          </div>
+          <div style="font-size:12px; line-height:1.6; color:var(--color-neutral-700);">Red is a state, not a decoration: it appears while audio is being captured, on the primary action, and on an error. Nowhere else.</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-6);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">02 — Type: Archivo, both roles</div>
+      <div style="border:2px solid var(--color-text);">
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; padding:var(--space-3) var(--space-4); border-bottom:2px solid var(--color-text); font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-700);">
+          <div>Token</div><div>Sample</div><div>Spec</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-6) var(--space-4); border-bottom:2px solid var(--color-divider);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">display-xl</div>
+          <div style="font-family:var(--font-heading); font-size:44px; font-weight:800; letter-spacing:-0.03em; line-height:1;">Let Klar type</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 800 · 44/44 · -3%</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-4); border-bottom:2px solid var(--color-divider);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">display-m</div>
+          <div style="font-family:var(--font-heading); font-size:28px; font-weight:800; letter-spacing:-0.025em; line-height:1.1;">Give Klar a microphone</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 800 · 28/31 · -2.5%</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-4); border-bottom:2px solid var(--color-divider);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">title</div>
+          <div style="font-size:17px; font-weight:600;">Cleanup strength</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 600 · 17/24</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-4); border-bottom:2px solid var(--color-divider);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">body</div>
+          <div style="font-size:13.5px; line-height:1.55; color:var(--color-neutral-800);">Speech is processed on this Mac. Nothing leaves the machine.</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 400 · 13.5/21</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-4); border-bottom:2px solid var(--color-divider);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">label</div>
+          <div style="font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-700);">Dictionary</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 700 · 10 · +16%</div>
+        </div>
+        <div style="display:grid; grid-template-columns:170px 1fr 210px; align-items:center; padding:var(--space-4);">
+          <div style="font-size:12px; font-weight:600; letter-spacing:0.06em;">figure</div>
+          <div style="font-size:13px; font-weight:600; letter-spacing:0.06em; font-variant-numeric:tabular-nums;">⌥ SPACE · 0:07 · 812 MB · 142 WPM</div>
+          <div style="font-size:11px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">Archivo 600 · tabular · +6%</div>
+        </div>
+      </div>
+      <div style="font-size:12.5px; line-height:1.6; color:var(--color-neutral-700); max-width:76ch;">The system has no monospace face, so hotkeys, durations and file sizes are set in Archivo with tabular figures and wider tracking. They read as machine values without introducing a second typeface.</div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-6);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">03 — Signature element</div>
+      <div style="display:grid; grid-template-columns:1fr 380px; gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="background:var(--color-surface); padding:var(--space-8); display:flex; align-items:center; justify-content:center;">
+          <div style="width:260px; height:64px; box-sizing:border-box; background:var(--color-neutral-100); border:2px solid var(--color-text); box-shadow:var(--shadow-lg); display:flex; align-items:center; gap:var(--space-3); padding:0 var(--space-4);">
+            <div style="display:flex; align-items:center; gap:2px; height:30px; width:84px;">
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.07s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.14s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.21s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.28s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.35s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.42s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.49s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.56s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.63s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.7s;"></div>
+              <div style="width:3px; height:30px; background:var(--color-accent); animation:klarBar 1.05s ease-in-out infinite; animation-delay:0.77s;"></div>
+            </div>
+            <div style="flex:1; display:flex; flex-direction:column; gap:var(--space-1);">
+              <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-accent);">Listening</div>
+              <div style="font-size:10.5px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-600);">0:04 — HOLD ⌥ SPACE</div>
+            </div>
+          </div>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; justify-content:space-between; gap:var(--space-6);">
+          <p style="margin:0; font-size:16px; line-height:1.5; letter-spacing:-0.01em; text-wrap:pretty;">The dictation overlay: a 260×64 rectangle whose live waveform collapses into the finished sentence, so the product's one idea happens in front of you every time you use it.</p>
+          <div style="display:flex; flex-direction:column; gap:var(--space-2); font-size:11.5px; font-weight:500; letter-spacing:0.05em; color:var(--color-neutral-700);">
+            <div>RADIUS 0 — EVERYWHERE</div>
+            <div>RULES 2PX — NEVER HAIRLINES</div>
+            <div>SPACE 4 / 8 / 12 / 16 / 24 / 32</div>
+            <div>ELEVATION SHADOW-SM / MD / LG</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-6);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">04 — Motion</div>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:15px; font-weight:700;">Overlay only</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">The overlay is a live object and moves constantly. The main window has no motion beyond a 120 ms hover tint.</p>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:15px; font-weight:700;">Resolve, never bounce</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">cubic-bezier(0.2, 0.8, 0.2, 1) for entrances, linear for audio. No spring overshoot, no easing on level meters.</p>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:15px; font-weight:700;">Durations</div>
+          <div style="font-size:12px; font-weight:500; letter-spacing:0.05em; line-height:1.9; color:var(--color-neutral-700);">APPEAR 140 · STATE 220<br>COLLAPSE 420 · DISMISS 180</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

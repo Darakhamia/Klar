@@ -1,0 +1,10 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the main window is permitted to do. Kept to the minimum — every addition is a new way for the frontend to reach the machine.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:allow-open-url"
+  ]
+}

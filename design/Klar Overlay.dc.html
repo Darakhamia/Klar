@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-8e3f2e58-9960-48cc-8001-18ab32255873/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#f3f2f2; }
+  a { color:var(--color-accent-700); text-decoration:none; }
+  a:hover { color:var(--color-accent); }
+</style>
+</helmet>
+<div style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); padding:var(--space-8) var(--space-8) 96px; min-height:100vh; -webkit-font-smoothing:antialiased;">
+  <div style="max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:var(--space-8);">
+
+    <header style="display:flex; flex-direction:column; gap:var(--space-4); padding-bottom:var(--space-6); border-bottom:2px solid var(--color-text);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-accent-700);">Klar — dictation overlay</div>
+      <h1 style="font-family:var(--font-heading); font-weight:800; font-size:50px; line-height:0.98; letter-spacing:-0.03em; margin:0; max-width:22ch;">Three ways to watch noise become text.</h1>
+      <p style="margin:0; max-width:68ch; font-size:15px; line-height:1.6; color:var(--color-neutral-800); text-wrap:pretty;">All three share one shell: 260×64 at rest, no radius, a 2px rule all the way round, and a near-opaque ground so it holds an edge on white paper, a dark IDE and a photograph alike. They differ in what the transformation looks like.</p>
+    </header>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Live — the full cycle, over three backgrounds</div>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:var(--space-4);">
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="position:relative; height:250px; overflow:hidden; background:#ffffff; border:2px solid var(--color-text); padding:var(--space-6); box-sizing:border-box; display:flex; flex-direction:column; gap:9px;">
+            <div style="font-family:var(--font-heading); font-size:16px; font-weight:800; letter-spacing:-0.02em; margin-bottom:var(--space-1);">Re: Friday ship</div>
+            <div style="height:7px; background:var(--color-neutral-300); width:92%;"></div>
+            <div style="height:7px; background:var(--color-neutral-300); width:78%;"></div>
+            <div style="height:7px; background:var(--color-neutral-300); width:86%;"></div>
+            <div style="height:7px; background:var(--color-neutral-300); width:44%;"></div>
+            <div style="position:absolute; left:50%; bottom:var(--space-6); transform:translateX(-50%);">
+              <dc-import name="OverlayPill" variant="collapse" theme="dark" autoplay="{{ true }}" hint-size="260px,64px"></dc-import>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="font-size:15px; font-weight:700;">A — Collapse</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">The waveform is the text. Bars flatten, widen into word blocks, then the sentence lands in their place.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="position:relative; height:250px; overflow:hidden; background:var(--color-text); border:2px solid var(--color-text); padding:var(--space-6); box-sizing:border-box; display:flex; flex-direction:column; gap:var(--space-2); font-size:12px; font-weight:500; letter-spacing:0.02em; line-height:1.5;">
+            <div style="color:var(--color-neutral-600);">1  <span style="color:var(--color-neutral-400);">export function</span> <span style="color:var(--color-neutral-100);">insertText</span><span style="color:var(--color-neutral-400);">(target) {</span></div>
+            <div style="color:var(--color-neutral-600);">2    <span style="color:var(--color-neutral-400);">const</span> <span style="color:var(--color-neutral-100);">clean</span> <span style="color:var(--color-neutral-400);">= polish(raw)</span></div>
+            <div style="color:var(--color-neutral-600);">3    <span style="color:var(--color-neutral-400);">return</span> <span style="color:var(--color-neutral-100);">target.type(clean)</span></div>
+            <div style="color:var(--color-neutral-600);">4  <span style="color:var(--color-neutral-400);">}</span></div>
+            <div style="position:absolute; left:50%; bottom:var(--space-6); transform:translateX(-50%);">
+              <dc-import name="OverlayPill" variant="focus" theme="dark" autoplay="{{ true }}" hint-size="356px,64px"></dc-import>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="font-size:15px; font-weight:700;">B — Focus</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">Your words are on screen the whole time, out of focus. Blur is the progress bar; the sentence sharpens as it cleans up.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="position:relative; height:250px; overflow:hidden; border:2px solid var(--color-text); background:repeating-linear-gradient(135deg, var(--color-neutral-300) 0 10px, var(--color-neutral-200) 10px 20px); padding:var(--space-6); box-sizing:border-box; display:flex; align-items:flex-start;">
+            <div style="font-size:10px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-700);">photo / video call</div>
+            <div style="position:absolute; left:50%; bottom:var(--space-6); transform:translateX(-50%);">
+              <dc-import name="OverlayPill" variant="scan" theme="light" autoplay="{{ true }}" hint-size="356px,64px"></dc-import>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="font-size:15px; font-weight:700;">C — Scan</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">A single line sweeps left to right. Behind it the waveform has already turned into words. Shown here in the light shell.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Five states — dark shell</div>
+      <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); padding-left:2px;">
+        <div></div>
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Listening</div>
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Thinking</div>
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Polishing</div>
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Done</div>
+        <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Error</div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-neutral-900); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700; color:var(--color-neutral-100);">A — Collapse</div>
+          <dc-import name="OverlayPill" variant="collapse" state="listening" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="thinking" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="polishing" theme="dark" hint-size="300px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="done" theme="dark" hint-size="316px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="error" theme="dark" hint-size="340px,64px"></dc-import>
+        </div>
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-neutral-900); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700; color:var(--color-neutral-100);">B — Focus</div>
+          <dc-import name="OverlayPill" variant="focus" state="listening" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="thinking" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="polishing" theme="dark" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="done" theme="dark" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="error" theme="dark" hint-size="340px,64px"></dc-import>
+        </div>
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-neutral-900); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700; color:var(--color-neutral-100);">C — Scan</div>
+          <dc-import name="OverlayPill" variant="scan" state="listening" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="thinking" theme="dark" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="polishing" theme="dark" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="done" theme="dark" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="error" theme="dark" hint-size="340px,64px"></dc-import>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Five states — light shell</div>
+      <div style="display:flex; flex-direction:column; gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-surface); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700;">A — Collapse</div>
+          <dc-import name="OverlayPill" variant="collapse" state="listening" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="thinking" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="polishing" theme="light" hint-size="300px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="done" theme="light" hint-size="316px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="collapse" state="error" theme="light" hint-size="340px,64px"></dc-import>
+        </div>
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-surface); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700;">B — Focus</div>
+          <dc-import name="OverlayPill" variant="focus" state="listening" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="thinking" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="polishing" theme="light" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="done" theme="light" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="focus" state="error" theme="light" hint-size="340px,64px"></dc-import>
+        </div>
+        <div style="display:grid; grid-template-columns:120px repeat(5, 1fr); gap:var(--space-3); align-items:center; background:var(--color-surface); padding:var(--space-6) var(--space-4); overflow-x:auto;">
+          <div style="font-size:13px; font-weight:700;">C — Scan</div>
+          <dc-import name="OverlayPill" variant="scan" state="listening" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="thinking" theme="light" hint-size="260px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="polishing" theme="light" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="done" theme="light" hint-size="356px,64px"></dc-import>
+          <dc-import name="OverlayPill" variant="scan" state="error" theme="light" hint-size="340px,64px"></dc-import>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Rules</div>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:14px; font-weight:700;">Red means live</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">The accent appears only while audio is being captured or a scan line is moving. Once text is in, the overlay goes grey and leaves.</p>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:14px; font-weight:700;">Width earns itself</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">260 px at rest. It only grows once there are real words to show, and never past 360.</p>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:14px; font-weight:700;">Error waits</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">Every other state auto-dismisses. The error stays until dismissed and names the fix: “No microphone found. Check your input device in system settings.”</p>
+        </div>
+        <div style="background:var(--color-bg); padding:var(--space-6); display:flex; flex-direction:column; gap:var(--space-2);">
+          <div style="font-size:14px; font-weight:700;">Windows</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">Same shell, Ctrl + Space, and the 2px rule stays — it reads as deliberate against Fluent's rounded surfaces rather than unfinished.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

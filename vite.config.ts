@@ -1,0 +1,23 @@
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+// Tauri drives this dev server, so the port is fixed and failure to bind must
+// be loud rather than silently moving to another port the shell won't find.
+export default defineConfig({
+  plugins: [react()],
+  clearScreen: false,
+  server: {
+    port: 1420,
+    strictPort: true,
+    watch: {
+      // The Rust side has its own rebuild loop; watching it here just burns CPU.
+      ignored: ["**/src-tauri/**", "**/target/**"],
+    },
+  },
+  build: {
+    outDir: "dist",
+    // Klar targets a known WebView2 / WKWebView, not the open web.
+    target: "es2022",
+    sourcemap: true,
+  },
+});

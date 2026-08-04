@@ -1,0 +1,23 @@
+# Rust
+/target
+/src-tauri/target
+/src-tauri/gen
+
+# Frontend
+/node_modules
+/dist
+*.tsbuildinfo
+
+# Whisper models — downloaded at runtime into the app data dir, and a copy here
+# during development. Hundreds of megabytes; never committed.
+/models
+
+# Editors and OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Local overrides
+.env
+.env.local

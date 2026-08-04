@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-8e3f2e58-9960-48cc-8001-18ab32255873/styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#f3f2f2; }
+  a { color:var(--color-accent-700); text-decoration:none; }
+  a:hover { color:var(--color-accent); }
+</style>
+</helmet>
+<div style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); padding:var(--space-8) var(--space-8) 96px; min-height:100vh; -webkit-font-smoothing:antialiased;">
+  <div style="max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:var(--space-8);">
+
+    <header style="display:flex; flex-direction:column; gap:var(--space-4); padding-bottom:var(--space-6); border-bottom:2px solid var(--color-text);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-accent-700);">Klar — menu bar</div>
+      <h1 style="font-family:var(--font-heading); font-weight:800; font-size:50px; line-height:0.98; letter-spacing:-0.03em; margin:0; max-width:20ch;">Status, last three, out.</h1>
+      <p style="margin:0; max-width:64ch; font-size:15px; line-height:1.6; color:var(--color-neutral-800); text-wrap:pretty;">300 px wide. The icon itself is the status: three bars grey when idle, red and moving while dictating, collapsed when something needs attention. Clicking a dictation copies it.</p>
+    </header>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Dark</div>
+      <div style="border:2px solid var(--color-text); background:repeating-linear-gradient(135deg, #2d2b2b 0 12px, #201e1d 12px 24px);">
+        <div style="height:28px; background:#201e1d; border-bottom:2px solid color-mix(in srgb, #f8f4f4 30%, transparent); display:flex; align-items:center; justify-content:flex-end; gap:var(--space-6); padding:0 var(--space-4); font-size:11.5px; font-weight:500; color:#f8f4f4;">
+          <div style="display:flex; align-items:center; gap:2px; height:14px;">
+            <div style="width:2px; height:6px; background:#ff563c;"></div>
+            <div style="width:2px; height:12px; background:#ff563c;"></div>
+            <div style="width:2px; height:9px; background:#ff563c;"></div>
+          </div>
+          <div style="font-weight:600; letter-spacing:0.06em; font-variant-numeric:tabular-nums; color:#bab6b6;">100%</div>
+          <div style="font-weight:600; letter-spacing:0.06em; font-variant-numeric:tabular-nums;">Tue 14:02</div>
+        </div>
+        <div style="padding:var(--space-3) 96px 56px 0; display:flex; justify-content:flex-end;">
+          <div style="--color-bg:#201e1d; --color-surface:#2d2b2b; --color-text:#f8f4f4; --color-accent:#ff563c; --color-divider:color-mix(in srgb, #f8f4f4 40%, transparent); width:300px; background:#201e1d; color:#f8f4f4; border:2px solid #f8f4f4; box-shadow:var(--shadow-lg);">
+
+            <div style="padding:var(--space-3) var(--space-4); display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid color-mix(in srgb, #f8f4f4 30%, transparent);">
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <div style="font-size:13px; font-weight:700;">Ready</div>
+                <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#9b9797;">Local model — English</div>
+              </div>
+              <div style="font-size:11.5px; font-weight:600; letter-spacing:0.08em; padding:5px var(--space-2); background:#2d2b2b; border:2px solid #605d5d;">⌥ SPACE</div>
+            </div>
+
+            <div style="padding:var(--space-3) var(--space-4) var(--space-1); font-size:9.5px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:#7d7979;">Recent</div>
+            <div style="padding:0 var(--space-2) var(--space-2); display:flex; flex-direction:column;">
+              <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); cursor:pointer; background:#2d2b2b;" style-hover="background:#444141">
+                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3);">
+                  <div style="font-size:12.5px; font-weight:500; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Ship on Friday. Tell the team.</div>
+                  <div style="font-size:9.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#ff563c; flex-shrink:0;">Copy</div>
+                </div>
+                <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#7d7979;">Linear — 2 min ago — 0:06</div>
+              </div>
+              <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px; line-height:1.35; color:#bab6b6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Can you take another look at the migration plan before standup?</div>
+                <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#7d7979;">Slack — 18 min ago — 0:09</div>
+              </div>
+              <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px; line-height:1.35; color:#bab6b6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Rename the flag to klar.polish.strength and default it to medium.</div>
+                <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:#7d7979;">VS Code — 41 min ago — 0:11</div>
+              </div>
+            </div>
+
+            <div style="height:2px; background:color-mix(in srgb, #f8f4f4 30%, transparent);"></div>
+
+            <div style="padding:var(--space-2); display:flex; flex-direction:column;">
+              <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px;">Language</div>
+                <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#bab6b6;">ENGLISH ⌄</div>
+              </div>
+              <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px;">Pause Klar</div>
+                <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#7d7979;">⇧⌥ SPACE</div>
+              </div>
+              <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px;">Settings</div>
+                <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#7d7979;">⌘,</div>
+              </div>
+              <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between; cursor:pointer;" style-hover="background:#2d2b2b">
+                <div style="font-size:12.5px; color:#bab6b6;">Quit</div>
+                <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:#7d7979;">⌘Q</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Light, and the three icon states</div>
+      <div style="display:grid; grid-template-columns:1fr 300px; gap:var(--space-4); align-items:start;">
+
+        <div style="border:2px solid var(--color-text); background:repeating-linear-gradient(135deg, var(--color-neutral-300) 0 12px, var(--color-neutral-200) 12px 24px);">
+          <div style="height:28px; background:var(--color-neutral-100); border-bottom:2px solid var(--color-text); display:flex; align-items:center; justify-content:flex-end; gap:var(--space-6); padding:0 var(--space-4); font-size:11.5px; font-weight:500;">
+            <div style="display:flex; align-items:center; gap:2px; height:14px;">
+              <div style="width:2px; height:6px; background:var(--color-accent);"></div>
+              <div style="width:2px; height:12px; background:var(--color-accent);"></div>
+              <div style="width:2px; height:9px; background:var(--color-accent);"></div>
+            </div>
+            <div style="font-weight:600; letter-spacing:0.06em; font-variant-numeric:tabular-nums; color:var(--color-neutral-600);">100%</div>
+            <div style="font-weight:600; letter-spacing:0.06em; font-variant-numeric:tabular-nums;">Tue 14:02</div>
+          </div>
+          <div style="padding:var(--space-3) 96px 56px 0; display:flex; justify-content:flex-end;">
+            <div style="width:300px; background:var(--color-neutral-100); border:2px solid var(--color-text); box-shadow:var(--shadow-lg);">
+              <div style="padding:var(--space-3) var(--space-4); display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid var(--color-text);">
+                <div style="display:flex; flex-direction:column; gap:3px;">
+                  <div style="font-size:13px; font-weight:700;">Ready</div>
+                  <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-neutral-600);">Local model — English</div>
+                </div>
+                <div style="font-size:11.5px; font-weight:600; letter-spacing:0.08em; padding:5px var(--space-2); background:var(--color-neutral-200); border:2px solid var(--color-neutral-400);">⌥ SPACE</div>
+              </div>
+              <div style="padding:var(--space-3) var(--space-4) var(--space-1); font-size:9.5px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-neutral-600);">Recent</div>
+              <div style="padding:0 var(--space-2) var(--space-2); display:flex; flex-direction:column;">
+                <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); background:var(--color-neutral-200); cursor:pointer;">
+                  <div style="display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-3);">
+                    <div style="font-size:12.5px; font-weight:500; line-height:1.35; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Ship on Friday. Tell the team.</div>
+                    <div style="font-size:9.5px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-accent); flex-shrink:0;">Copy</div>
+                  </div>
+                  <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">Linear — 2 min ago — 0:06</div>
+                </div>
+                <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); cursor:pointer;">
+                  <div style="font-size:12.5px; line-height:1.35; color:var(--color-neutral-800); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Can you take another look at the migration plan before standup?</div>
+                  <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">Slack — 18 min ago — 0:09</div>
+                </div>
+                <div style="padding:var(--space-2); display:flex; flex-direction:column; gap:var(--space-1); cursor:pointer;">
+                  <div style="font-size:12.5px; line-height:1.35; color:var(--color-neutral-800); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Rename the flag to klar.polish.strength and default it to medium.</div>
+                  <div style="font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">VS Code — 41 min ago — 0:11</div>
+                </div>
+              </div>
+              <div style="height:2px; background:var(--color-text);"></div>
+              <div style="padding:var(--space-2); display:flex; flex-direction:column;">
+                <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-size:12.5px;">Language</div>
+                  <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:var(--color-neutral-700);">ENGLISH ⌄</div>
+                </div>
+                <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-size:12.5px;">Pause Klar</div>
+                  <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:var(--color-neutral-600);">⇧⌥ SPACE</div>
+                </div>
+                <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-size:12.5px;">Settings</div>
+                  <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:var(--color-neutral-600);">⌘,</div>
+                </div>
+                <div style="padding:var(--space-2); display:flex; align-items:center; justify-content:space-between;">
+                  <div style="font-size:12.5px; color:var(--color-neutral-700);">Quit</div>
+                  <div style="font-size:11px; font-weight:600; letter-spacing:0.08em; color:var(--color-neutral-600);">⌘Q</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:2px; background:var(--color-text); border:2px solid var(--color-text);">
+          <div style="background:var(--color-bg); padding:var(--space-4); display:flex; align-items:center; gap:var(--space-4);">
+            <div style="display:flex; align-items:center; gap:2px; height:16px; width:22px;">
+              <div style="width:2px; height:6px; background:var(--color-neutral-500);"></div>
+              <div style="width:2px; height:12px; background:var(--color-neutral-500);"></div>
+              <div style="width:2px; height:9px; background:var(--color-neutral-500);"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:13px; font-weight:700;">Idle</div>
+              <div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">Grey, no motion</div>
+            </div>
+          </div>
+          <div style="background:var(--color-bg); padding:var(--space-4); display:flex; align-items:center; gap:var(--space-4);">
+            <div style="display:flex; align-items:center; gap:2px; height:16px; width:22px;">
+              <div style="width:2px; height:12px; background:var(--color-accent);"></div>
+              <div style="width:2px; height:6px; background:var(--color-accent);"></div>
+              <div style="width:2px; height:14px; background:var(--color-accent);"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:13px; font-weight:700;">Dictating</div>
+              <div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">Red, bars follow audio</div>
+            </div>
+          </div>
+          <div style="background:var(--color-bg); padding:var(--space-4); display:flex; align-items:center; gap:var(--space-4);">
+            <div style="display:flex; align-items:center; gap:2px; height:16px; width:22px;">
+              <div style="width:2px; height:3px; background:var(--color-accent-700);"></div>
+              <div style="width:2px; height:3px; background:var(--color-accent-700);"></div>
+              <div style="width:2px; height:3px; background:var(--color-accent-700);"></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px;">
+              <div style="font-size:13px; font-weight:700;">Needs attention</div>
+              <div style="font-size:11px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-neutral-600);">Deep red, bars collapsed</div>
+            </div>
+          </div>
+          <div style="background:var(--color-bg); padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);">
+            <div style="font-size:13px; font-weight:700;">Windows tray</div>
+            <p style="margin:0; font-size:12px; line-height:1.6; color:var(--color-neutral-700);">Same menu, anchored bottom-right, and “Pause Klar” moves above Language because tray menus are read upward.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

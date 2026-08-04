@@ -1,0 +1,37 @@
+[workspace]
+members = ["crates/klar-core", "crates/klar-platform", "crates/klar-cli", "src-tauri"]
+resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/darakhamia/klar"
+
+[workspace.dependencies]
+klar-core = { path = "crates/klar-core" }
+klar-platform = { path = "crates/klar-platform" }
+
+anyhow = "1.0.104"
+thiserror = "2.0.19"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tracing-appender = "0.2.5"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+directories = "6.0.0"
+parking_lot = "0.12.5"
+
+# Opted into by klar-core and klar-platform only (`[lints] workspace = true`).
+# Tests and `main` are exempt — see the test-scoped allow at the top of each lib.rs.
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
