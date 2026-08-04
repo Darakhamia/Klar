@@ -515,6 +515,7 @@ fn dictate(args: &DictateArgs) -> Result<()> {
     };
 
     let mut session: Option<Session> = None;
+    let mut timings = Timings::default();
 
     loop {
         // Keep draining while recording, so nothing is lost between events.
@@ -537,6 +538,7 @@ fn dictate(args: &DictateArgs) -> Result<()> {
                 &options,
                 &mut *injector,
                 args.dry,
+                &mut timings,
             )?;
         }
 
@@ -561,6 +563,7 @@ fn dictate(args: &DictateArgs) -> Result<()> {
                         &options,
                         &mut *injector,
                         args.dry,
+                        &mut timings,
                     )?;
                 }
             }
@@ -606,12 +609,44 @@ impl Session {
 ///
 /// This is the path the latency budget in CLAUDE.md applies to, so each stage
 /// is timed separately.
+/// Key-up-to-text, one entry per dictation.
+///
+/// M3's criterion is a median over at least twenty real dictations, so the
+/// numbers accumulate here rather than being read off the screen one at a time.
+#[derive(Default)]
+struct Timings {
+    key_up_to_text: Vec<u128>,
+}
+
+impl Timings {
+    fn record(&mut self, millis: u128) {
+        self.key_up_to_text.push(millis);
+    }
+
+    fn summary(&self) -> String {
+        if self.key_up_to_text.is_empty() {
+            return String::new();
+        }
+        let mut sorted = self.key_up_to_text.clone();
+        sorted.sort_unstable();
+        let median = sorted[sorted.len() / 2];
+        // The worst case is what the user remembers, so it is worth showing
+        // alongside the median the criterion is written against.
+        let worst = sorted.last().copied().unwrap_or(median);
+        format!(
+            "   [{} dictations: median {median} ms, worst {worst} ms]",
+            sorted.len()
+        )
+    }
+}
+
 fn finish(
     mut session: Session,
     transcriber: &mut WhisperTranscriber,
     options: &TranscribeOptions,
     injector: &mut dyn klar_platform::TextInjector,
     dry: bool,
+    timings: &mut Timings,
 ) -> Result<()> {
     let released = Instant::now();
     let _ = session.pump();
@@ -650,11 +685,13 @@ fn finish(
     let method = injector.inject(&transcript.text)?;
     let inject_ms = inject_started.elapsed().as_millis();
 
+    let key_up_to_text = released.elapsed().as_millis();
+    timings.record(key_up_to_text);
+
     println!(
-        "  transcribe {} ms   inject {} ms ({method:?})   key-up to text {} ms",
+        "  transcribe {} ms   inject {inject_ms} ms ({method:?})   key-up to text {key_up_to_text} ms{}",
         transcript.elapsed.as_millis(),
-        inject_ms,
-        released.elapsed().as_millis()
+        timings.summary()
     );
     Ok(())
 }

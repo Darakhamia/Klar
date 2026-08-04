@@ -9,6 +9,14 @@ Newest first.
 
 ## M2 — hotkey and injection
 
+### Passed on Windows
+
+Dictation lands in Notepad, a browser text field, VS Code and a messenger. The
+clipboard comes back afterwards. A foreground window running elevated is
+reported as such instead of the paste vanishing — the integrity-level check does
+what it was written to do, which was the part of this milestone written blind
+and least certain.
+
 ### Measured, on the target machine
 
 Key-up to inserted text, `dictate` on the same RTX 5070 Ti:

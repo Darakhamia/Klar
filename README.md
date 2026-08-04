@@ -13,11 +13,11 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
-**M2 in review — hold to talk.** The `WH_KEYBOARD_LL` hook, clipboard
-injection with save and restore, the keystroke fallback and elevation detection
-are written and compile for Windows; `klar-cli dictate` runs the whole loop.
-Not yet manually tested across applications, which is what M2's criterion asks
-for.
+**M2 passed on Windows.** Hold Ctrl+Space anywhere, speak, release, and the
+text appears at the cursor — 315 ms from key-up, injection 5 ms of that.
+Verified into Notepad, a browser field, VS Code and a messenger; the clipboard
+survives; an elevated foreground window is reported rather than silently
+swallowing the paste.
 
 **M1 passed on Windows.** Capture, resampling, model download and whisper.cpp
 work from `klar-cli` on a real machine: 9.98 s of speech transcribed in 320 ms
