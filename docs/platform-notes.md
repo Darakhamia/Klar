@@ -38,6 +38,24 @@ No GPU feature is on by default: CI has no CUDA toolkit, and a default that
 silently produced a CPU build is exactly the failure this milestone exists to
 rule out.
 
+### The CUDA build fails with a bare `unwrap` if the toolkit is missing
+
+`whisper-rs-sys`'s build script reads `CUDA_PATH` and unwraps it
+(`build.rs:59`), so a machine without the CUDA Toolkit — or a shell opened
+before it was installed — gets:
+
+```
+called `Result::unwrap()` on an `Err` value: NotPresent
+```
+
+with no mention of CUDA. It is worth recognising on sight: install the CUDA
+Toolkit, open a new shell so `CUDA_PATH` is in the environment, and rebuild.
+`nvcc --version` is the quick check.
+
+Note that a CPU build exercises everything in M1 except the latency budget, so
+capture, model download and transcription accuracy can all be verified while
+the toolkit downloads.
+
 ### Linux needs ALSA headers
 
 `cpal` will not build without `libasound2-dev`. Linux is not a target, but the
