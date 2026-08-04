@@ -9,6 +9,26 @@ Newest first.
 
 ## M1 — speech to text
 
+### Measured, on the target machine
+
+RTX 5070 Ti (Blackwell, sm_120), CUDA 13.3, `large-v3-turbo-q5_0`, whisper.cpp
+1.8.3, greedy sampling with the language pinned:
+
+| Audio | Transcription | Real time |
+|---|---|---|
+| 4.98 s (en) | 259 ms | 19.2× |
+| 4.98 s (ru) | 270 ms | 18.4× |
+| 9.98 s (ru) | 320 ms | 31.1× |
+
+The M1 criterion was a 10-second clip under one second; 320 ms clears it three
+times over. Model load is 610-630 ms and is *not* part of that — the app loads
+once at startup and keeps the model resident, which is what M3 depends on.
+
+Note that transcription time barely doubles as the audio doubles: the encoder
+runs over a fixed 30-second window regardless, so most of the cost is constant.
+That is good news for M3's sliding window and bad news for anyone hoping short
+utterances would be proportionally cheaper.
+
 ### The cross-target check stopped working, and that is fine
 
 M0 verified `src-tauri` from Linux with `cargo check --target

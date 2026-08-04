@@ -13,9 +13,10 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
-**M1 — speech to text, headless.** Capture, resampling, model download and
-whisper.cpp all work from `klar-cli`; the GPU build is verified per machine, not
-assumed. No hotkey and no injection yet — those are M2, and the platform
+**M1 passed on Windows.** Capture, resampling, model download and whisper.cpp
+work from `klar-cli` on a real machine: 9.98 s of speech transcribed in 320 ms
+on CUDA, against a criterion of one second. See `docs/platform-notes.md` for the
+numbers. No hotkey and no injection yet — those are M2, and the platform
 backends still return `NotImplemented`.
 
 ## Layout
