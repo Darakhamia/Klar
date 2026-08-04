@@ -7,11 +7,42 @@ license.workspace = true
 repository.workspace = true
 description = "Klar dictation pipeline — no Tauri, no UI."
 
+[features]
+default = []
+
+# GPU backends for whisper.cpp. None is on by default: CI has no CUDA toolkit,
+# and a build that silently falls back to CPU is the failure mode M1 exists to
+# rule out. Pick one explicitly for a local build.
+cuda = ["whisper-rs/cuda"]
+vulkan = ["whisper-rs/vulkan"]
+metal = ["whisper-rs/metal"]
+coreml = ["whisper-rs/coreml"]
+
 [dependencies]
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 serde.workspace = true
+
+cpal = "0.18.1"
+rubato = "4.0.0"
+# raw-api: for whisper_print_system_info, the one honest answer about what
+# accelerators this binary actually carries.
+whisper-rs = { version = "0.16.0", features = ["tracing_backend", "raw-api"] }
+hound = "3.5.1"
+
+reqwest = { version = "0.13.4", default-features = false, features = [
+    "rustls",
+    "stream",
+    "http2",
+] }
+futures-util = { version = "0.3.33", default-features = false, features = ["std"] }
+sha2 = "0.11.0"
+hex = "0.4.3"
+directories.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
 
 [lints]
 workspace = true

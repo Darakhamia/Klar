@@ -9,6 +9,9 @@
 
 #![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
+pub mod asr;
+pub mod audio;
+pub mod model;
 pub mod state;
 
 pub use state::{IllegalTransition, Input, Machine, State, StateEvent};

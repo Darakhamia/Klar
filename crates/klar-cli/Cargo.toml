@@ -7,6 +7,15 @@ license.workspace = true
 repository.workspace = true
 description = "Headless harness for the Klar pipeline."
 
+[features]
+default = []
+# Forwarded to klar-core so `cargo run -p klar-cli --features cuda` builds the
+# GPU path without the workspace having to name whisper-rs itself.
+cuda = ["klar-core/cuda"]
+vulkan = ["klar-core/vulkan"]
+metal = ["klar-core/metal"]
+coreml = ["klar-core/coreml"]
+
 [[bin]]
 name = "klar-cli"
 path = "src/main.rs"
@@ -16,5 +25,6 @@ klar-core.workspace = true
 klar-platform.workspace = true
 anyhow.workspace = true
 clap = { version = "4.6.5", features = ["derive"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true

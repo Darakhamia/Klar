@@ -7,6 +7,54 @@ Newest first.
 
 ---
 
+## M1 — speech to text
+
+### The cross-target check stopped working, and that is fine
+
+M0 verified `src-tauri` from Linux with `cargo check --target
+x86_64-pc-windows-msvc`. That no longer covers the whole workspace: `whisper-rs`
+builds whisper.cpp through `cmake`, which needs a real MSVC toolchain rather
+than just the Rust target. Windows verification now rests on the
+`windows-latest` CI job, which builds the workspace for real.
+
+### The auto-detect pass is not free
+
+Transcribing an 11-second clip with `tiny.en` took 3109 ms; pinning the language
+took it to 1617 ms. Whisper runs its language detector over the first window
+whenever the language is `None` — and on an English-only model the answer it
+returns is noise (`sq`, p = 0.01). `WhisperTranscriber` now pins `en` for any
+model that reports `is_multilingual() == false`, and the app should pin the
+language for multilingual models too once the user has chosen one.
+
+### Proving the backend, not assuming it
+
+Compile-time features say what was *asked* for. The runtime answer comes from
+whisper.cpp itself: `install_logging_hooks()` routes its device-registration
+lines into `tracing`, so `whisper_backend_init_gpu: no GPU found` lands in
+Klar's log. `whisper_print_system_info()` (via the `raw-api` feature) adds the
+accelerator list the binary actually carries. `klar-cli doctor` prints both.
+
+No GPU feature is on by default: CI has no CUDA toolkit, and a default that
+silently produced a CPU build is exactly the failure this milestone exists to
+rule out.
+
+### Linux needs ALSA headers
+
+`cpal` will not build without `libasound2-dev`. Linux is not a target, but the
+pipeline crates are developed and unit-tested there, so the Ubuntu CI job
+installs it.
+
+### Model integrity
+
+HuggingFace's `x-linked-etag` header carries the file's SHA-256 (it is the LFS
+oid), which is where the catalogue's checksums come from — no need to download
+half a gigabyte to record a hash. Resume uses a `.part` file and a `Range`
+request; a server that answers 200 to a ranged request is refused outright
+rather than appended to, because appending would produce a corrupt model that
+fails at inference time instead of at load time.
+
+---
+
 ## M0 — scaffold
 
 ### Cross-compiling the check, not the build

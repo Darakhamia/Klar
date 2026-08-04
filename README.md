@@ -13,10 +13,10 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
-**M0 — scaffold.** The workspace, the state machine, the platform traits, the
-Tauri shell and CI are in place. There is no audio yet: the platform backends
-return `NotImplemented` and the window reports what the Rust side knows about
-itself. M1 is speech to text, headless.
+**M1 — speech to text, headless.** Capture, resampling, model download and
+whisper.cpp all work from `klar-cli`; the GPU build is verified per machine, not
+assumed. No hotkey and no injection yet — those are M2, and the platform
+backends still return `NotImplemented`.
 
 ## Layout
 
@@ -37,10 +37,33 @@ present on Windows 11) plus the MSVC build tools.
 
 ```sh
 npm install
-npm run tauri dev      # the app
-cargo run -p klar-cli -- doctor    # what the OS says about permissions
-cargo run -p klar-cli -- dry-run   # the event stream the overlay will render
+npm run tauri dev                  # the app
+cargo run -p klar-cli -- doctor    # OS, audio devices, ASR backend, models
 ```
+
+### Dictating from the command line
+
+whisper.cpp is built from source, so the first `cargo build` after a clean
+checkout takes a few minutes and needs `cmake` on the PATH.
+
+```sh
+# Build with the GPU your machine actually has. Without a feature flag you get
+# a CPU build, which works and misses the latency budget by an order of
+# magnitude — deliberately loud rather than silent.
+cargo build -p klar-cli --features cuda      # Windows, NVIDIA
+cargo build -p klar-cli --features metal     # macOS
+
+cargo run -p klar-cli --features cuda -- model download
+cargo run -p klar-cli --features cuda -- listen --seconds 5
+```
+
+`doctor` prints the backend and `listen` prints the real-time factor, so a
+build that quietly fell back to CPU is visible immediately rather than at M3.
+
+Other commands: `devices`, `record --seconds 5 --out debug.wav`,
+`transcribe file.wav`, `model list|verify`, `dry-run`.
+
+Set `KLAR_MODELS_DIR` to keep models out of the app data directory.
 
 Before every commit:
 
