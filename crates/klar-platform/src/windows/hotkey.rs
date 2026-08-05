@@ -18,7 +18,7 @@
 use super::keys;
 use crate::{BadBinding, Binding, Hotkey, HotkeyEvent, PlatformError};
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{RecvTimeoutError, Sender, channel};
 use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
@@ -146,6 +146,39 @@ thread_local! {
     static CAPTURE: RefCell<Option<Sender<Chord>>> = const { RefCell::new(None) };
 }
 
+/// Set while a chord is being captured, read by the push-to-talk hook.
+///
+/// The two hooks are installed at once and Windows calls the most recently
+/// installed first, which should mean the capture hook always gets the key
+/// before the push-to-talk one is offered it. This does not rely on that: while
+/// a capture is running the push-to-talk hook stands down completely, so it
+/// cannot swallow a key or start a dictation whichever order they are called
+/// in.
+static CAPTURING: AtomicBool = AtomicBool::new(false);
+
+/// Key events the capture hook was handed, whether or not they completed a
+/// chord. Zero after a capture that timed out means the callback was never
+/// called at all — a different problem from one where the filtering is wrong,
+/// and not something the outcome alone distinguishes.
+static SEEN: AtomicU32 = AtomicU32::new(0);
+
+/// Turns [`CAPTURING`] off however the capture ends, including early returns.
+struct CaptureGuard;
+
+impl CaptureGuard {
+    fn begin() -> Self {
+        SEEN.store(0, Ordering::SeqCst);
+        CAPTURING.store(true, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for CaptureGuard {
+    fn drop(&mut self) {
+        CAPTURING.store(false, Ordering::SeqCst);
+    }
+}
+
 /// Wait for one chord and report it. See [`crate::capture`].
 ///
 /// A second, temporary hook rather than a mode on the push-to-talk one: the two
@@ -153,6 +186,7 @@ thread_local! {
 /// swallows one unknown key once — and the caller has stopped the engine, so
 /// there is nothing for them to fight over.
 pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
+    let _capturing = CaptureGuard::begin();
     let (chord_tx, chord_rx) = channel::<Chord>();
     let (ready_tx, ready_rx) = channel::<Result<u32, String>>();
 
@@ -185,9 +219,15 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
         tracing::error!("the hotkey capture thread panicked");
     }
 
+    let seen = SEEN.load(Ordering::SeqCst);
     let (code, mask) = match outcome {
         Ok(chord) => chord,
-        Err(RecvTimeoutError::Timeout) => return Err(BadBinding::TimedOut.into()),
+        Err(RecvTimeoutError::Timeout) => {
+            // `seen` is the whole diagnosis here: zero means the callback was
+            // never called, which is a dead hook rather than a fussy filter.
+            tracing::warn!(seen, "capture timed out; key events the hook was handed");
+            return Err(BadBinding::TimedOut.into());
+        }
         Err(RecvTimeoutError::Disconnected) => {
             return Err(PlatformError::Hotkey("the capture hook stopped".into()));
         }
@@ -197,7 +237,7 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
         return Err(BadBinding::Cancelled.into());
     }
 
-    tracing::info!(vk = format!("{code:#04x}"), mask, "chord captured");
+    tracing::info!(vk = format!("{code:#04x}"), mask, seen, "chord captured");
 
     let key = keys::key_from_virtual(code).ok_or(BadBinding::UnsupportedKey)?;
     let binding = Binding {
@@ -246,6 +286,10 @@ unsafe extern "system" fn capture_proc(code: i32, wparam: WPARAM, lparam: LPARAM
         // SAFETY: forwarding the parameters we were given, unmodified.
         return unsafe { CallNextHookEx(None, code, wparam, lparam) };
     }
+
+    // Counted before any filtering, so a capture that found nothing can still
+    // say whether it was ever called.
+    SEEN.fetch_add(1, Ordering::Relaxed);
 
     let swallow = CAPTURE.with(|slot| {
         // `try_borrow_mut` rather than `borrow_mut`: a panic here would unwind
@@ -349,6 +393,14 @@ fn pump_until_quit() {
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     // Negative codes must be passed straight through without inspection.
     if code < 0 {
+        // SAFETY: forwarding the parameters we were given, unmodified.
+        return unsafe { CallNextHookEx(None, code, wparam, lparam) };
+    }
+
+    // A capture is running. Stand down completely rather than trust that the
+    // capture hook is called first: whichever order Windows uses, only one of
+    // the two acts on the key.
+    if CAPTURING.load(Ordering::Relaxed) {
         // SAFETY: forwarding the parameters we were given, unmodified.
         return unsafe { CallNextHookEx(None, code, wparam, lparam) };
     }

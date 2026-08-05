@@ -63,27 +63,39 @@ Because the user can remove it from Task Manager while Klar is not running,
 `settings_get` reports what the registry says rather than what the JSON file
 says. The stored field is what they asked for; the registry is what is true.
 
-### Rebinding worked; the window never heard about it
+### Letting a window log into the same file settled three wrong theories
 
-The log settled it. `rebinding: accepted binding=[Control]+Character('c')`,
-the engine restarted, the hook installed on the new binding, and a dictation
-ran on it thirteen seconds later. The rebind had worked every time. What failed
-was the reply: `emit("klar://hotkey", …)` returned `Ok` and the settings window
-did not react.
+Rebinding did not work in the app while the identical platform call worked from
+`klar-cli`, and I spent three rounds inferring what the settings window saw
+from what Rust logged. Two of those inferences were wrong. The one that
+mattered — "the main window is not receiving events" — was wrong in a way that
+sent the whole investigation sideways, because it was consistent with
+everything Rust could see.
 
-So the event never reached the main window — the same window whose live input
-meter is fed by `klar://event`. That is the second time a window has been deaf
-without saying so, and the reason it hid twice is that both subscriptions
-dropped the failure into `console.error` and carried on.
+`ui_log` gives a window a line in Klar's own log. The first run with it in
+produced `ui: first engine event received: ready`, which killed that theory
+outright, and `ui: rebind: asked` followed by `ui: rebind: rejected with
+Nothing was pressed`, which showed the bridge working in both directions and
+narrowed the fault to one place: the capture hook does not see keystrokes while
+the app's push-to-talk hook is also installed.
 
-Rebinding no longer uses an event. It is a question the window asked and is
-waiting on, so the answer belongs in the command's return value — one thing
-that has to arrive rather than two, and commands are the part of the bridge
-this window has always been able to use. The remaining subscription passes its
-failure to the UI instead of the console.
+Two halves that fail independently need one log, not two. This should have gone
+in at M6 with the first window.
 
-The window-level event problem is still open. It costs the meter in Voice and
-nothing else today.
+### The capture hook, when it is not the only hook
+
+Still open. What is known: capture works from the CLI, where no push-to-talk
+hook exists; in the app it works sometimes and reports nothing pressed the
+rest. The difference is the second hook.
+
+Two things went in to narrow it. The push-to-talk hook now stands down entirely
+while `CAPTURING` is set, so it cannot swallow a key or start a dictation
+whichever order Windows calls the two in — the documented order is
+most-recently-installed first, which should make capture always win, but that
+assumption is exactly what has not held up. And the capture hook counts every
+event it is handed before any filtering, so a timeout now reports whether the
+callback was called at all. Zero is a dead hook; a non-zero count with no chord
+is a filter that is too strict. The outcome alone could not tell those apart.
 
 ### `listen` is ACL-gated per window, and a refusal is silent
 
