@@ -75,20 +75,37 @@ the first build — each one missing produces an error that does not name it.
 | CMake | whisper.cpp is a CMake project. Visual Studio bundles a copy, but only inside its own directory — it is not on `PATH`, so install it standalone | `winget install Kitware.CMake` |
 | LLVM | `bindgen` needs `libclang.dll` to generate the whisper.cpp bindings | `winget install LLVM.LLVM` |
 | CUDA Toolkit | Only for `--features cuda`. Blackwell (RTX 50xx) needs 12.8+ | `winget install Nvidia.CUDA` |
-| Vulkan SDK | Only for `--features vulkan`. It is `glslc` that is needed — whisper.cpp compiles its shaders at build time | `winget install KhronosGroup.VulkanSDK` |
+| Vulkan SDK | Only for `--features vulkan`. `glslc` compiles whisper.cpp's shaders and `Lib\vulkan-1.lib` is what it links against. Set `VULKAN_SDK` yourself — see below | `winget install KhronosGroup.VulkanSDK` |
 | WebView2 | The Tauri window. Already present on Windows 11 | [Download](https://developer.microsoft.com/microsoft-edge/webview2/) |
 
-Open a new terminal afterwards: `CUDA_PATH`, `VULKAN_SDK` and the LLVM path only
-reach processes started after installation. `whisper-rs-sys` reports the Vulkan
-case as *"Please install Vulkan SDK and ensure that VULKAN_SDK env variable is
-set"* — in the terminal that was already open when you installed it, that means
-the second half, not the first.
+Open a new terminal afterwards: `CUDA_PATH` and the LLVM path only reach
+processes started after installation.
 
 If `bindgen` still cannot find libclang, point it at the install explicitly:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("LIBCLANG_PATH", "C:\Program Files\LLVM\bin", "User")
 ```
+
+#### `VULKAN_SDK` is not set for you
+
+`whisper-rs-sys` panics with *"Please install Vulkan SDK and ensure that
+VULKAN_SDK env variable is set"*, and the first half is usually a red herring:
+the SDK installed fine and nothing pointed at it. A `winget` install runs the
+LunarG installer unattended, and unattended is exactly when it skips setting the
+machine-wide variable. Check the disk rather than the message:
+
+```powershell
+Get-ChildItem C:\VulkanSDK | Select-Object -Last 1     # what is actually there
+
+$sdk = "C:\VulkanSDK\1.4.350.0"                        # your version
+[Environment]::SetEnvironmentVariable("VULKAN_SDK", $sdk, "User")
+$env:VULKAN_SDK = $sdk                                 # and for this shell
+```
+
+The build needs `$VULKAN_SDK\Lib\vulkan-1.lib` to link and `$VULKAN_SDK\Bin\glslc.exe`
+to compile the shaders, both of which it finds from that one variable. None of
+it is needed to *run* Klar — see [Which GPU build](#which-gpu-build).
 
 macOS needs Xcode command line tools and CMake (`brew install cmake`).
 
