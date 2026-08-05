@@ -78,9 +78,13 @@ the first build — each one missing produces an error that does not name it.
 | Vulkan SDK | Only for `--features vulkan`. It is `glslc` that is needed — whisper.cpp compiles its shaders at build time | `winget install KhronosGroup.VulkanSDK` |
 | WebView2 | The Tauri window. Already present on Windows 11 | [Download](https://developer.microsoft.com/microsoft-edge/webview2/) |
 
-Open a new terminal afterwards: `CUDA_PATH` and the LLVM path only reach
-processes started after installation. If `bindgen` still cannot find libclang,
-point it at the install explicitly:
+Open a new terminal afterwards: `CUDA_PATH`, `VULKAN_SDK` and the LLVM path only
+reach processes started after installation. `whisper-rs-sys` reports the Vulkan
+case as *"Please install Vulkan SDK and ensure that VULKAN_SDK env variable is
+set"* — in the terminal that was already open when you installed it, that means
+the second half, not the first.
+
+If `bindgen` still cannot find libclang, point it at the install explicitly:
 
 ```powershell
 [Environment]::SetEnvironmentVariable("LIBCLANG_PATH", "C:\Program Files\LLVM\bin", "User")

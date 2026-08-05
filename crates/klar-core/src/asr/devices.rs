@@ -34,7 +34,14 @@ pub enum DeviceKind {
 }
 
 impl DeviceKind {
-    const fn from_raw(raw: u32) -> Self {
+    /// Spelled with bindgen's own type alias rather than a concrete integer.
+    ///
+    /// bindgen renders a C enum as whatever the platform's compiler makes it:
+    /// `c_uint` with gcc, `c_int` with MSVC. Naming a width here compiles on
+    /// one of the two operating systems Klar targets and not the other — which
+    /// is how this first went out. The alias is the same type as the constants
+    /// below on every platform, by construction.
+    const fn from_raw(raw: whisper_rs::whisper_rs_sys::ggml_backend_dev_type) -> Self {
         match raw {
             whisper_rs::whisper_rs_sys::ggml_backend_dev_type_GGML_BACKEND_DEVICE_TYPE_CPU => {
                 Self::Cpu
