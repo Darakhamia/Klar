@@ -1,10 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the main window is permitted to do. Kept to the minimum — every addition is a new way for the frontend to reach the machine.",
-  "windows": ["main"],
-  "permissions": [
-    "core:default",
-    "opener:allow-open-url"
-  ]
+  "description": "What every Klar window is permitted to do. Kept to the minimum — every addition is a new way for the frontend to reach the machine. All three windows are here because `listen` is one of the core commands this gates, and the overlay and onboarding render from the engine's events.",
+  "windows": ["main", "overlay", "onboarding"],
+  "permissions": ["core:default"]
 }

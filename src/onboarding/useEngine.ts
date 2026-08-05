@@ -7,8 +7,13 @@
  */
 
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { ENGINE_EVENT, type Binding, type EngineEvent, type PipelineState } from "../lib/ipc";
+import {
+  ENGINE_EVENT,
+  subscribe,
+  type Binding,
+  type EngineEvent,
+  type PipelineState,
+} from "../lib/ipc";
 
 /** Bars in the level meter, from the design's first screen. */
 export const BARS = 8;
@@ -41,42 +46,40 @@ export function useEngine(): EngineView {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const pending = listen<EngineEvent>(ENGINE_EVENT, ({ payload }) => {
-      switch (payload.kind) {
-        case "state":
-          setState(payload.state);
-          if (payload.state === "recording") {
-            setSaid(null);
+    return subscribe<EngineEvent>(
+      ENGINE_EVENT,
+      (payload) => {
+        switch (payload.kind) {
+          case "state":
+            setState(payload.state);
+            if (payload.state === "recording") {
+              setSaid(null);
+              setError(null);
+            }
+            break;
+          case "level":
+            setLevels((previous) => [...previous.slice(1), payload.peak]);
+            if (payload.peak > HEARD) setHeard(true);
+            break;
+          case "text":
+            // Only a settled result counts: the partials exist to make the
+            // overlay feel alive, and showing one here as "what you said" would
+            // put a sentence on screen that is still going to change.
+            if (payload.settled) setSaid(payload.text);
+            break;
+          case "failed":
+            setError(payload.message);
+            break;
+          case "ready":
+            setHotkey(payload.hotkey);
             setError(null);
-          }
-          break;
-        case "level":
-          setLevels((previous) => [...previous.slice(1), payload.peak]);
-          if (payload.peak > HEARD) setHeard(true);
-          break;
-        case "text":
-          // Only a settled result counts: the partials exist to make the
-          // overlay feel alive, and showing one here as "what you said" would
-          // put a sentence on screen that is still going to change.
-          if (payload.settled) setSaid(payload.text);
-          break;
-        case "failed":
-          setError(payload.message);
-          break;
-        case "ready":
-          setHotkey(payload.hotkey);
-          setError(null);
-          break;
-        case "loading":
-          break;
-      }
-    });
-
-    return () => {
-      void pending.then((unlisten) => {
-        unlisten();
-      });
-    };
+            break;
+          case "loading":
+            break;
+        }
+      },
+      setError,
+    );
   }, []);
 
   return { state, levels, heard, said, hotkey, error };

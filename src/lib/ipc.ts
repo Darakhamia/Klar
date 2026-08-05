@@ -7,6 +7,7 @@
  */
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export interface AppVersion {
   version: string;
@@ -64,6 +65,43 @@ export const MODEL_EVENT = "klar://model";
 /** True when running inside the Tauri shell rather than a plain browser tab. */
 export const inShell = (): boolean => isTauri();
 
+/**
+ * Subscribe to an event, and return the cleanup an effect wants.
+ *
+ * `listen` can be refused — it is one of the core commands the capability files
+ * gate, so a window missing from `capabilities/default.json` gets a rejected
+ * promise and nothing else. Writing that as `void pending.then(unlisten)`
+ * throws the refusal away, which is how two windows shipped subscribing to an
+ * event channel that was never going to reach them. Anything that fails here is
+ * loud.
+ */
+export function subscribe<T>(
+  event: string,
+  handler: (payload: T) => void,
+  onError?: (message: string) => void,
+): () => void {
+  let cancelled = false;
+  let stop: (() => void) | null = null;
+
+  listen<T>(event, ({ payload }) => {
+    handler(payload);
+  })
+    .then((unlisten) => {
+      if (cancelled) unlisten();
+      else stop = unlisten;
+    })
+    .catch((cause: unknown) => {
+      const message = cause instanceof Error ? cause.message : String(cause);
+      console.error(`klar: could not subscribe to ${event}`, message);
+      onError?.(message);
+    });
+
+  return () => {
+    cancelled = true;
+    stop?.();
+  };
+}
+
 export const appVersion = (): Promise<AppVersion> => invoke<AppVersion>("app_version");
 
 export const defaultHotkey = (): Promise<Binding> => invoke<Binding>("default_hotkey");
@@ -106,7 +144,9 @@ const KEY_LABELS: Record<Key, string> = {
 /** Render a binding the way the design writes it: `CTRL SPACE`, `⌥ SPACE`. */
 export function formatBinding(binding: Binding, os: string): string {
   const mac = os === "macos";
-  const parts = binding.modifiers.map((m) => (mac ? MODIFIER_GLYPHS[m].mac : MODIFIER_GLYPHS[m].other));
+  const parts = binding.modifiers.map((m) =>
+    mac ? MODIFIER_GLYPHS[m].mac : MODIFIER_GLYPHS[m].other,
+  );
   parts.push(KEY_LABELS[binding.key]);
   return parts.join(mac ? " " : " + ").toUpperCase();
 }

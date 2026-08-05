@@ -7,8 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
-import { ENGINE_EVENT, type EngineEvent, type PipelineState } from "../lib/ipc";
+import { ENGINE_EVENT, subscribe, type EngineEvent, type PipelineState } from "../lib/ipc";
 
 export type { PipelineState };
 
@@ -37,7 +36,7 @@ export function useEngine(): Engine {
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const pending = listen<EngineEvent>(ENGINE_EVENT, ({ payload }) => {
+    return subscribe<EngineEvent>(ENGINE_EVENT, (payload) => {
       switch (payload.kind) {
         case "state":
           setState(payload.state);
@@ -68,12 +67,6 @@ export function useEngine(): Engine {
           break;
       }
     });
-
-    return () => {
-      void pending.then((unlisten) => {
-        unlisten();
-      });
-    };
   }, []);
 
   // The counter ticks only while recording, and only ten times a second —

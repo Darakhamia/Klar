@@ -8,12 +8,12 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
 import {
   MODEL_EVENT,
   downloadModel,
   formatBinding,
   restartEngine,
+  subscribe,
   type Binding,
   type ModelEvent,
 } from "../lib/ipc";
@@ -55,22 +55,24 @@ export function Setup({
   const restarted = useRef(false);
 
   useEffect(() => {
-    const pending = listen<ModelEvent>(MODEL_EVENT, ({ payload }) => {
-      if (payload.phase === "downloading") {
-        setAnchors((previous) =>
-          payload.id in previous
-            ? previous
-            : { ...previous, [payload.id]: { at: Date.now(), received: payload.received } },
-        );
-      }
-      if (payload.phase === "failed") setError(`${payload.id}: ${payload.message}`);
-      setProgress((previous) => ({ ...previous, [payload.id]: payload }));
-    });
-    return () => {
-      void pending.then((unlisten) => {
-        unlisten();
-      });
-    };
+    return subscribe<ModelEvent>(
+      MODEL_EVENT,
+      (payload) => {
+        if (payload.phase === "downloading") {
+          setAnchors((previous) =>
+            payload.id in previous
+              ? previous
+              : {
+                  ...previous,
+                  [payload.id]: { at: Date.now(), received: payload.received },
+                },
+          );
+        }
+        if (payload.phase === "failed") setError(`${payload.id}: ${payload.message}`);
+        setProgress((previous) => ({ ...previous, [payload.id]: payload }));
+      },
+      setError,
+    );
   }, []);
 
   useEffect(() => {

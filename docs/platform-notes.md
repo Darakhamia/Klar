@@ -9,6 +9,32 @@ Newest first.
 
 ## M6 — interface
 
+### `listen` is ACL-gated per window, and a refusal is silent
+
+The overlay and onboarding both subscribed to `klar://event` and both received
+nothing. `capabilities/default.json` said `"windows": ["main"]`, and `listen` is
+a core command the capability system gates — a webview not named in any
+capability gets its `listen` rejected. App-defined commands from
+`invoke_handler` are *not* gated, which is what made this so confusing to look
+at: `invoke("models")` worked in the same window that could not subscribe to a
+single event.
+
+It went unnoticed because every subscription was written as
+
+```ts
+const pending = listen(...);
+return () => { void pending.then((unlisten) => unlisten()); };
+```
+
+`void` on the cleanup path throws away the rejection. The overlay had been
+appearing and rendering its idle frame for a whole milestone — Rust shows and
+hides that window, so it looked alive.
+
+Both halves are fixed: the capability names all three windows, and every
+subscription goes through `subscribe()` in `src/lib/ipc.ts`, which logs a
+refusal and hands it to the caller. Any new window needs a line in
+`capabilities/default.json` or it is deaf in exactly the same way.
+
 ### Windows has no microphone permission worth asking about
 
 `permission_state(Microphone)` returns `Unknown` on Windows and means it. The
