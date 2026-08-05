@@ -116,8 +116,8 @@ panic from the `cmake` crate, which says nothing. Keep the whole log and pull
 the cause out of it:
 
 ```powershell
-npm run tauri build -- --features vulkan 2>&1 | Out-File C:\kv\build.log
-Select-String -Path C:\kv\build.log -Context 0,4 `
+npm run tauri build -- --features vulkan 2>&1 | Out-File C:\klar-build.log
+Select-String -Path C:\klar-build.log -Context 0,4 `
   -Pattern "CMake Error|error [A-Z]+\d+|error C\d|exceeds the OS max path|fatal error" |
   Select-Object -First 20
 ```
