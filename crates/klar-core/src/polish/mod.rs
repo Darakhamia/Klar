@@ -76,6 +76,27 @@ impl Strength {
             Self::Heavy => (0.24, 1.15),
         }
     }
+
+    /// How much of the result must be words the speaker actually said.
+    ///
+    /// The signal length cannot give. A cleanup is the speaker's own words with
+    /// the fillers taken out, so nearly every word of it appears in the
+    /// transcript. An answer is not: "I don't have any Q3 numbers to send"
+    /// shares three words with the question it was asked, and that is the
+    /// failure this stage exists to catch — it went past the length guard at
+    /// 67% and had to be caught by a person reading the output.
+    ///
+    /// Not 100%, because a cleanup legitimately rewrites some words: "four
+    /// thirty" becomes "4:30", "I will" becomes "I'll". Heavy is lowest because
+    /// rewriting sentences is what it was asked to do.
+    const fn min_overlap(self) -> f32 {
+        match self {
+            Self::Verbatim => 1.0,
+            Self::Light => 0.85,
+            Self::Balanced => 0.75,
+            Self::Heavy => 0.55,
+        }
+    }
 }
 
 /// Why a polished result was thrown away and the transcript used instead.
@@ -92,6 +113,9 @@ pub enum Rejection {
 
     #[error("the result is {ratio:.0}% of the transcript, above the {ceiling:.0}% ceiling")]
     TooLong { ratio: f32, ceiling: f32 },
+
+    #[error("only {overlap:.0}% of the result is words the speaker said, below {floor:.0}%")]
+    Invented { overlap: f32, floor: f32 },
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -199,7 +223,51 @@ pub fn guard(transcript: &str, polished: &str, strength: Strength) -> Result<Str
         });
     }
 
+    let overlap = overlap(transcript, polished);
+    let floor = strength.min_overlap();
+    if overlap < floor {
+        return Err(Rejection::Invented {
+            overlap: overlap * 100.0,
+            floor: floor * 100.0,
+        });
+    }
+
     Ok(polished.to_owned())
+}
+
+/// The fraction of the polished text's words that the speaker also said.
+///
+/// Word by word rather than in order: a cleanup is allowed to reorder a clause
+/// and to drop the halves of a self-correction, and neither is the failure this
+/// is looking for.
+fn overlap(transcript: &str, polished: &str) -> f32 {
+    let said: std::collections::HashSet<String> = words(transcript).collect();
+    if said.is_empty() {
+        return 1.0;
+    }
+
+    let mut total = 0_u32;
+    let mut kept = 0_u32;
+    for word in words(polished) {
+        total += 1;
+        if said.contains(&word) {
+            kept += 1;
+        }
+    }
+
+    if total == 0 {
+        return 1.0;
+    }
+    f32::from(u16::try_from(kept).unwrap_or(u16::MAX))
+        / f32::from(u16::try_from(total).unwrap_or(u16::MAX))
+}
+
+/// Lowercased runs of letters and digits. Punctuation is what the polisher was
+/// asked to add, so it cannot count against it.
+fn words(text: &str) -> impl Iterator<Item = String> + '_ {
+    text.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
 }
 
 #[cfg(test)]
@@ -251,6 +319,36 @@ mod tests {
             guard(said, answered, Strength::Balanced),
             Err(Rejection::TooShort { .. })
         ));
+    }
+
+    #[test]
+    fn an_answer_the_right_length_is_still_refused() {
+        // Verbatim from llama3.2:3b, and the reason this guard is not length
+        // alone. It is 67% of the question it was asked, which cleared the
+        // length floor comfortably, and it is an answer.
+        let said = "can you send me the numbers for Q3 when you get a chance";
+        let answered = "I don't have any Q3 numbers to send.";
+
+        assert!(
+            matches!(
+                guard(said, answered, Strength::Balanced),
+                Err(Rejection::Invented { .. })
+            ),
+            "the model answered the dictation and it went through"
+        );
+    }
+
+    #[test]
+    fn a_real_cleanup_keeps_enough_of_the_speakers_words() {
+        // Also from the fixture run. "four thirty" became "4:30", which is a
+        // cleanup doing its job and costs overlap — the floor has to leave room
+        // for it.
+        let said = "the deploy is at four thirty and Marcus is on call and the rollback \
+                    plan is in the runbook so we should be fine";
+        let typed = "The deploy is at 4:30. Marcus is on call. The rollback plan is in the \
+                     runbook, so we should be fine.";
+
+        assert!(guard(said, typed, Strength::Balanced).is_ok());
     }
 
     #[test]

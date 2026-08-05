@@ -195,7 +195,10 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
     // inside a runtime, so blocking on it cannot nest.
     let mut polisher = match &config.polish {
         Some(ollama) => match klar_core::polish::Ollama::new(ollama.clone()) {
-            Ok(ollama) => Polisher::Ollama(ollama),
+            Ok(polisher) => {
+                warm(ollama.clone());
+                Polisher::Ollama(polisher)
+            }
             Err(error) => {
                 tracing::warn!(%error, "polish is configured but unusable; dictating plain");
                 Polisher::Noop
@@ -398,6 +401,43 @@ fn dictate(
     );
     apply(app, &mut machine, Input::Injected);
     Ok(())
+}
+
+/// Load the polish model into memory, in the background, now.
+///
+/// A cold Ollama takes tens of seconds to load a model — 25 seconds measured
+/// for a 3B one, against a 400 ms budget. Somebody is going to pay that, and it
+/// should be the app at startup rather than the user at their first sentence.
+///
+/// Its own thread with its own runtime: this must not hold up registering the
+/// hotkey, and a failure is not worth reporting to anybody — the dictation path
+/// already falls back to the transcript.
+fn warm(config: OllamaConfig) {
+    let spawned = std::thread::Builder::new()
+        .name("klar-polish-warm".into())
+        .spawn(move || {
+            let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+            else {
+                return;
+            };
+            let Ok(ollama) = klar_core::polish::Ollama::new(config) else {
+                return;
+            };
+
+            match runtime.block_on(ollama.warm()) {
+                Ok(took) => tracing::info!(
+                    took_ms = took.as_millis() as u64,
+                    "polish model loaded and held in memory"
+                ),
+                Err(error) => tracing::warn!(%error, "could not warm the polish model"),
+            }
+        });
+
+    if let Err(error) = spawned {
+        tracing::warn!(%error, "could not start the warm-up thread");
+    }
 }
 
 /// Run the polish stage, or hand the transcript back unchanged.

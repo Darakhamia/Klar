@@ -195,6 +195,7 @@ pub async fn polish_status() -> PolishStatus {
         // Only a listing; the dictation budget has nothing to do with it, and a
         // server that is starting up deserves longer than 400 ms to say hello.
         budget: std::time::Duration::from_secs(3),
+        ..klar_core::polish::OllamaConfig::default()
     };
 
     let models = match klar_core::polish::Ollama::new(config) {

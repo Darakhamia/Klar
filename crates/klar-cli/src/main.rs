@@ -651,7 +651,16 @@ async fn polish(args: &PolishArgs) -> Result<()> {
         endpoint: args.endpoint.clone(),
         model: args.model.clone(),
         budget,
+        ..OllamaConfig::default()
     })?;
+
+    // Loading a model is tens of seconds and has nothing to do with the budget.
+    // Paid here, before the clock starts, because that is what the app does at
+    // startup and a first-call measurement would be about the disk.
+    match ollama.warm().await {
+        Ok(took) => println!("warm   model loaded in {} ms\n", took.as_millis()),
+        Err(error) => bail!("{error}"),
+    }
 
     let started = Instant::now();
     let polished = ollama

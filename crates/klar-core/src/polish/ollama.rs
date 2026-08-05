@@ -28,6 +28,13 @@ pub struct OllamaConfig {
     pub model: String,
     /// How long the model gets before the transcript is used instead.
     pub budget: Duration,
+    /// How long Ollama should hold the model in memory after a call.
+    ///
+    /// Its own default unloads after five minutes, and loading a 3B model back
+    /// in measured 25 seconds — sixty times the budget, paid by whoever dictates
+    /// after a coffee. Klar is resident all day; the model it polishes with
+    /// should be too.
+    pub keep_alive: String,
 }
 
 impl Default for OllamaConfig {
@@ -36,6 +43,7 @@ impl Default for OllamaConfig {
             endpoint: DEFAULT_ENDPOINT.to_owned(),
             model: String::new(),
             budget: Duration::from_millis(400),
+            keep_alive: "8h".to_owned(),
         }
     }
 }
@@ -60,6 +68,52 @@ impl Ollama {
 
     pub fn config(&self) -> &OllamaConfig {
         &self.config
+    }
+
+    /// Load the model into memory, so the first real dictation does not pay for
+    /// it.
+    ///
+    /// Measured at 25 seconds for a 3B model on a cold start, against a 400 ms
+    /// budget. There is no making that fast; there is only making it happen
+    /// before somebody is waiting on it.
+    pub async fn warm(&self) -> Result<Duration, PolishError> {
+        let started = std::time::Instant::now();
+
+        let body = serde_json::json!({
+            "model": self.config.model,
+            "prompt": ".",
+            "stream": false,
+            "keep_alive": self.config.keep_alive,
+            // One token. The point is the load, not the answer.
+            "options": { "num_predict": 1 },
+        });
+
+        let url = format!("{}/api/generate", self.config.endpoint);
+        let response = self
+            .client
+            .post(&url)
+            .json(&body)
+            // Long enough for a large model on a slow disk. Nothing is waiting.
+            .timeout(Duration::from_secs(120))
+            .send()
+            .await
+            .map_err(|_| PolishError::Unreachable(self.config.endpoint.clone()))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            return Err(PolishError::Refused {
+                status: status.as_u16(),
+                body: response
+                    .text()
+                    .await
+                    .unwrap_or_default()
+                    .chars()
+                    .take(200)
+                    .collect(),
+            });
+        }
+
+        Ok(started.elapsed())
     }
 
     /// The models this Ollama has pulled, for the settings window to offer.
@@ -105,6 +159,7 @@ impl TextPolisher for Ollama {
             "system": system,
             "prompt": request.text,
             "stream": false,
+            "keep_alive": self.config.keep_alive,
             "options": {
                 // The same transcript must polish the same way twice. This is
                 // an editing pass, not a writing one.
@@ -174,6 +229,7 @@ mod tests {
             endpoint: "http://127.0.0.1:1".to_owned(),
             model: "whatever".to_owned(),
             budget: Duration::from_millis(400),
+            ..OllamaConfig::default()
         })
         .expect("client builds");
 
@@ -201,6 +257,7 @@ mod tests {
             endpoint: "http://127.0.0.1:1".to_owned(),
             model: "whatever".to_owned(),
             budget: Duration::from_millis(400),
+            ..OllamaConfig::default()
         })
         .expect("client builds");
 

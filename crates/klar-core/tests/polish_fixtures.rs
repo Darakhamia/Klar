@@ -17,6 +17,7 @@
 
 #![allow(
     clippy::expect_used,
+    clippy::panic,
     reason = "an integration test; a failure here is the report"
 )]
 
@@ -70,7 +71,6 @@ const FIXTURES: &[Fixture] = &[
     Fixture {
         said: "перенесём ревью на четверг нет на пятницу и я потом напишу заметки",
         strength: Strength::Balanced,
-        // Must come back in Russian, not translated into the prompt's language.
         keeps: &["пятниц", "заметки"],
         drops: &["Friday", "review"],
     },
@@ -93,6 +93,7 @@ async fn the_fixtures_survive_a_real_model() {
         // have a model, and a slow one failing here would say nothing useful.
         // Latency is measured below and reported rather than asserted.
         budget: Duration::from_secs(30),
+        ..OllamaConfig::default()
     })
     .expect("client builds");
 
@@ -100,6 +101,14 @@ async fn the_fixtures_survive_a_real_model() {
         ollama.available().await,
         "no model server at {endpoint} — start Ollama or unset KLAR_OLLAMA_MODEL"
     );
+
+    // Loading the model is tens of seconds and is not what these measure. The
+    // first run without this had two fixtures fail on a timeout that was the
+    // disk, not the prompt.
+    match ollama.warm().await {
+        Ok(took) => println!("model loaded in {took:?}\n"),
+        Err(error) => panic!("could not load {model}: {error}"),
+    }
 
     let mut failures = Vec::new();
     let mut slowest = Duration::ZERO;
