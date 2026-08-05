@@ -70,30 +70,41 @@ pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
     klar_platform::set_launch_at_login(settings.launch_at_login).map_err(|e| e.to_string())
 }
 
-/// Wait for the user to press a chord, bind it, and answer with it.
+/// Stop or resume the push-to-talk hook while the window reads a chord.
 ///
-/// A returned value rather than an event. Rebinding is a question the window
-/// asked and is waiting on, so the answer belongs in the reply — and an event
-/// is one more thing that has to arrive for the button to come back.
-///
-/// The engine keeps running throughout. Windows calls the most recently
-/// installed hook first, and the capture hook swallows every non-modifier
-/// key-down it sees, so the engine's push-to-talk hook is never handed the key
-/// and cannot start a dictation out from under the rebind.
-///
-/// The error is the refusal written for a person — timed out, cancelled, or a
-/// chord Klar will not bind — and is shown as it is.
+/// The window captures the key itself, from its own keyboard events. The hook
+/// has to stand down for that: it would otherwise swallow the current hotkey
+/// and start a dictation instead of letting the window see the key.
 #[tauri::command]
-pub async fn hotkey_capture(app: AppHandle) -> Result<Binding, String> {
-    tracing::info!("rebinding: waiting for a chord");
+pub fn hotkey_suspend(suspended: bool) {
+    tracing::info!(suspended, "push-to-talk hook suspended for a rebind");
+    klar_platform::suspend(suspended);
+}
 
-    // `capture` blocks for as long as the user takes to press something, which
-    // is not something to do on an async runtime's worker.
-    let binding = tauri::async_runtime::spawn_blocking(|| klar_platform::capture(CAPTURE_TIMEOUT))
-        .await
-        .map_err(|error| format!("the capture task failed: {error}"))?
-        .inspect_err(|error| tracing::info!(%error, "rebinding: refused"))
-        .map_err(|error| error.to_string())?;
+/// Bind the chord the window read, and answer with what it means.
+///
+/// `code` is a browser `KeyboardEvent.code` — the physical key, not the
+/// character it produces — and the platform layer decides what key that is.
+/// The window reports what it saw; nothing about the keyboard is decided in
+/// TypeScript.
+///
+/// The error is the refusal written for a person, and is shown as it is.
+#[tauri::command]
+pub fn hotkey_set(
+    app: AppHandle,
+    code: String,
+    modifiers: Vec<klar_platform::Modifier>,
+) -> Result<Binding, String> {
+    let key = klar_platform::key_from_browser_code(&code).ok_or_else(|| {
+        tracing::info!(code, "rebinding: unknown key");
+        klar_platform::BadBinding::UnsupportedKey.to_string()
+    })?;
+
+    let binding = Binding { modifiers, key };
+    binding.check().map_err(|error| {
+        tracing::info!(?binding, %error, "rebinding: refused");
+        error.to_string()
+    })?;
 
     tracing::info!(?binding, "rebinding: accepted");
 
@@ -110,10 +121,6 @@ pub async fn hotkey_capture(app: AppHandle) -> Result<Binding, String> {
 
     Ok(binding)
 }
-
-/// How long the user has to press something before capture gives up. Long
-/// enough to find a key, short enough that a forgotten capture ends itself.
-const CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
 /// Let a window write into the same log file the Rust side uses.
 ///

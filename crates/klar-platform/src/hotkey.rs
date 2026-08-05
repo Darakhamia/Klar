@@ -81,6 +81,56 @@ pub enum Key {
 pub const HIGHEST_FUNCTION_KEY: u8 = 12;
 
 impl Key {
+    /// The key a browser `KeyboardEvent.code` names, or `None` for one this
+    /// layer does not know — the platform backend gets those.
+    ///
+    /// The settings window reads the chord from its own keyboard events rather
+    /// than from the push-to-talk hook. It has to: the hook is not handed
+    /// keystrokes while Klar's own window has focus, which is exactly the
+    /// moment somebody is choosing a hotkey. A window that has focus is handed
+    /// its own key events by definition, so that is where the chord comes from.
+    ///
+    /// `code` names the physical key rather than the character it produces, so
+    /// this mapping does not move when the layout does.
+    pub fn from_browser_code(code: &str) -> Option<Self> {
+        if code == "Space" {
+            return Some(Self::Space);
+        }
+
+        if let Some(number) = code.strip_prefix('F')
+            && let Ok(number) = number.parse::<u8>()
+            && (1..=HIGHEST_FUNCTION_KEY).contains(&number)
+        {
+            return Some(Self::Function(number));
+        }
+
+        // `KeyA` and `Digit1` name the key at that position on a US layout,
+        // which is the same physical key everywhere.
+        for prefix in ["Key", "Digit", "Numpad"] {
+            if let Some(rest) = code.strip_prefix(prefix)
+                && let Some(character) = one_character(rest)
+            {
+                return Some(Self::Character(character));
+            }
+        }
+
+        let punctuation = match code {
+            "Minus" => '-',
+            "Equal" => '=',
+            "BracketLeft" => '[',
+            "BracketRight" => ']',
+            "Backslash" => '\\',
+            "Semicolon" => ';',
+            "Quote" => '\'',
+            "Comma" => ',',
+            "Period" => '.',
+            "Slash" => '/',
+            "Backquote" => '`',
+            _ => return None,
+        };
+        Some(Self::Character(punctuation))
+    }
+
     /// True for keys that may be bound without a modifier.
     ///
     /// The rule is what the key does when Klar is not looking: a key that types
@@ -138,6 +188,17 @@ impl Binding {
     }
 }
 
+/// The single ASCII alphanumeric in `rest`, lowercased, or `None` if it is
+/// anything else. `KeyA` gives `a`; `Enter` gives nothing.
+fn one_character(rest: &str) -> Option<char> {
+    let mut characters = rest.chars();
+    let first = characters.next()?;
+    if characters.next().is_some() || !first.is_ascii_alphanumeric() {
+        return None;
+    }
+    Some(first.to_ascii_lowercase())
+}
+
 /// Which edge of the hold fired.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HotkeyEvent {
@@ -162,15 +223,17 @@ pub trait Hotkey: Send {
     fn unregister(&mut self) -> Result<(), PlatformError>;
 }
 
-/// Wait for the user to press a chord, and report it instead of acting on it.
+/// The key a browser `KeyboardEvent.code` names, including the ones with no
+/// portable spelling — Tab, Insert, an arrow — which the platform supplies.
+pub fn key_from_browser_code(code: &str) -> Option<Key> {
+    Key::from_browser_code(code).or_else(|| crate::backend::key_from_browser_code(code))
+}
+
+/// Stop the push-to-talk hook acting, without unregistering it.
 ///
-/// Blocks, so it belongs on a background thread. The key that completes the
-/// chord is swallowed — the user is pressing it at a settings window, not at a
-/// text field — and Escape cancels.
-///
-/// A push-to-talk hook must not be registered at the same time: two hooks
-/// fighting over the same key would start a dictation while the user is trying
-/// to rebind it. The caller stops the engine first.
-pub fn capture(timeout: std::time::Duration) -> Result<Binding, PlatformError> {
-    crate::backend::capture_binding(timeout)
+/// For the moment the settings window is reading a new chord: the hook would
+/// otherwise swallow the current hotkey and start a dictation instead of
+/// letting the window see the key.
+pub fn suspend(suspended: bool) {
+    crate::backend::suspend(suspended);
 }

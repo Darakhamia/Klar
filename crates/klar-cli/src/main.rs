@@ -45,8 +45,6 @@ enum Command {
     Inject(InjectArgs),
     /// Watch the push-to-talk hotkey and print its events.
     Hotkey,
-    /// Capture one chord and print what it would be bound to. Nothing is saved.
-    Rebind(RebindArgs),
     /// Hold the hotkey, speak, release, and the text lands in the focused app.
     /// The M2 acceptance criterion end to end.
     Dictate(DictateArgs),
@@ -57,14 +55,6 @@ enum Command {
     Model(ModelCommand),
     /// Drive the state machine through one dictation with canned text.
     DryRun,
-}
-
-#[derive(clap::Args)]
-struct RebindArgs {
-    /// Register a push-to-talk hook first and leave it running, which is what
-    /// the app does while it captures. Proves the two hooks coexist.
-    #[arg(long)]
-    with_hook: bool,
 }
 
 #[derive(clap::Args)]
@@ -219,7 +209,6 @@ async fn main() -> Result<()> {
         Command::Vad(args) => vad(&args),
         Command::Inject(args) => inject(&args),
         Command::Hotkey => hotkey(),
-        Command::Rebind(args) => rebind(&args),
         Command::Dictate(args) => dictate(&args),
         Command::Model(command) => model_command(command).await,
         Command::DryRun => dry_run(),
@@ -629,51 +618,6 @@ fn hotkey() -> Result<()> {
                 println!("up    (held {held} ms)");
             }
         }
-    }
-    Ok(())
-}
-
-/// Capture one chord, as the settings window's Change button does, and print
-/// what came back.
-///
-/// The point of having this here: the app's version runs the same platform call
-/// through a Tauri command, a background thread and an event before anything
-/// reaches the screen, so a failure here and a failure there are different
-/// problems with different fixes.
-///
-/// `--with-hook` is the interesting one. It registers a push-to-talk hook first
-/// and leaves it registered, which is exactly what the app does — the engine
-/// keeps running while a chord is captured. Windows calls the most recently
-/// installed hook first, so the capture hook should swallow the key before the
-/// push-to-talk one is offered it. If that assumption is wrong, this prints a
-/// `down` line and the dictation the user was not asking for.
-fn rebind(args: &RebindArgs) -> Result<()> {
-    const WAIT: Duration = Duration::from_secs(10);
-
-    let mut hotkey = klar_platform::hotkey();
-    if args.with_hook {
-        let binding = klar_platform::default_binding();
-        hotkey.register(
-            &binding,
-            Box::new(|event| println!("  push-to-talk hook saw {event:?}")),
-        )?;
-        println!("push-to-talk hook registered on {binding:?} and left running.");
-    }
-
-    println!("press a chord — any key, with a modifier held. F-keys need none.");
-    println!("Escape cancels. {} seconds.", WAIT.as_secs());
-
-    match klar_platform::capture(WAIT) {
-        Ok(binding) => {
-            println!("captured  {binding:?}");
-            println!("would be saved as the push-to-talk binding.");
-        }
-        Err(error) => println!("refused   {error}"),
-    }
-
-    if args.with_hook {
-        hotkey.unregister()?;
-        println!("push-to-talk hook released.");
     }
     Ok(())
 }

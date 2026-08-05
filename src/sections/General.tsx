@@ -1,6 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Figure, Row, Segmented, Select } from "../components/Row";
-import { captureHotkey, formatBinding, note, type Binding } from "../lib/ipc";
+import {
+  formatBinding,
+  note,
+  setHotkey,
+  suspendHotkey,
+  type Binding,
+  type Modifier,
+} from "../lib/ipc";
 import type { Appearance, FinishAction, OverlayPosition, Settings } from "../lib/settings";
 
 export function General({
@@ -79,14 +86,36 @@ export function General({
   );
 }
 
+/** The keys that only ever build a chord, never complete one. */
+const MODIFIER_CODES = new Set([
+  "ControlLeft",
+  "ControlRight",
+  "AltLeft",
+  "AltRight",
+  "ShiftLeft",
+  "ShiftRight",
+  "MetaLeft",
+  "MetaRight",
+]);
+
+function heldModifiers(event: KeyboardEvent): Modifier[] {
+  const held: Modifier[] = [];
+  if (event.ctrlKey) held.push("control");
+  if (event.altKey) held.push("alt");
+  if (event.shiftKey) held.push("shift");
+  if (event.metaKey) held.push("meta");
+  return held;
+}
+
 /**
  * The push-to-talk binding, and rebinding it.
  *
- * The whole exchange is one command call: it resolves with the chord that was
- * bound, or rejects with the reason it was not. Rust has already saved it and
- * is restarting the engine on it by then, so there is nothing to save from
- * here — `onRebound` only tells the window above what it now holds, so that a
- * later save does not write the old binding back.
+ * The chord is read from this window's own keyboard events, not from the
+ * global hook. It has to be: while Klar's window has focus the hook is not
+ * handed keystrokes at all — which is exactly the moment somebody is choosing a
+ * hotkey — and a window that has focus is handed its own key events by
+ * definition. Rust is told the `KeyboardEvent.code` and which modifiers were
+ * down; what that key is, and whether it can be bound, is decided there.
  */
 function Hotkey({
   settings,
@@ -100,35 +129,71 @@ function Hotkey({
   const [capturing, setCapturing] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
 
-  // While capturing, the next key pressed anywhere is swallowed, so the row
-  // says what to do rather than leaving the old binding looking live.
+  useEffect(() => {
+    if (!capturing) return;
+
+    const stop = () => {
+      setCapturing(false);
+      void suspendHotkey(false);
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Nothing typed while choosing a hotkey should reach the page, including
+      // the chords the webview would otherwise act on itself.
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (event.code === "Escape") {
+        stop();
+        return;
+      }
+      // Still building the chord.
+      if (MODIFIER_CODES.has(event.code)) return;
+
+      note("settings", `rebind: read ${event.code}`);
+      setHotkey(event.code, heldModifiers(event))
+        .then((hotkey) => {
+          setRefused(null);
+          onRebound(hotkey);
+          stop();
+        })
+        .catch((cause: unknown) => {
+          // Refusals leave the capture running: the user is mid-decision, and
+          // taking the field away from them to make them press the button again
+          // would be the wrong answer to "that key needs a modifier".
+          setRefused(cause instanceof Error ? cause.message : String(cause));
+        });
+    };
+
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+    };
+  }, [capturing, onRebound]);
+
   const hint = capturing
-    ? "Press any key, with Ctrl, Alt, Shift or Win held. Function keys need no modifier. Escape cancels."
+    ? (refused ?? "Press any key, with Ctrl, Alt, Shift or Win held. Escape cancels.")
     : (refused ?? "Hold to dictate. Release to insert.");
 
   return (
-    <Row label="Dictation hotkey" hint={hint} alert={refused !== null && !capturing}>
+    <Row label="Dictation hotkey" hint={hint} alert={refused !== null}>
       <Figure>{formatBinding(settings.hotkey, os)}</Figure>
       <button
         type="button"
         className="btn btn--ghost"
-        disabled={capturing}
         onClick={() => {
+          if (capturing) {
+            setCapturing(false);
+            void suspendHotkey(false);
+            return;
+          }
           setRefused(null);
-          setCapturing(true);
-          note("settings", "rebind: asked, button should now read Press a key…");
-          captureHotkey()
-            .then((hotkey) => {
-              note("settings", `rebind: resolved with ${JSON.stringify(hotkey)}`);
-              onRebound(hotkey);
+          suspendHotkey(true)
+            .then(() => {
+              setCapturing(true);
             })
             .catch((cause: unknown) => {
-              const message = cause instanceof Error ? cause.message : String(cause);
-              note("settings", `rebind: rejected with ${message}`);
-              setRefused(message);
-            })
-            .finally(() => {
-              setCapturing(false);
+              setRefused(cause instanceof Error ? cause.message : String(cause));
             });
         }}
       >

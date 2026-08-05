@@ -5,7 +5,7 @@
 //! fails loudly rather than pretending to work.
 
 use crate::{
-    Binding, Hotkey, HotkeyEvent, InjectionMethod, Permission, PermissionState, PlatformError,
+    Binding, Hotkey, HotkeyEvent, InjectionMethod, Key, Permission, PermissionState, PlatformError,
     TextInjector,
 };
 
@@ -37,8 +37,11 @@ pub fn set_launch_at_login(_on: bool) -> Result<(), PlatformError> {
     Err(PlatformError::NotImplemented("launch at login"))
 }
 
-pub fn capture_binding(_timeout: std::time::Duration) -> Result<Binding, PlatformError> {
-    Err(PlatformError::NotImplemented("hotkey capture"))
+/// Nothing to stand down: there is no hook here to suspend.
+pub fn suspend(_suspended: bool) {}
+
+pub fn key_from_browser_code(_code: &str) -> Option<Key> {
+    None
 }
 
 struct NoHotkey;

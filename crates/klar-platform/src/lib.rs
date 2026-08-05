@@ -12,7 +12,8 @@ pub mod inject;
 pub mod permissions;
 
 pub use hotkey::{
-    BadBinding, Binding, HIGHEST_FUNCTION_KEY, Hotkey, HotkeyEvent, Key, Modifier, capture,
+    BadBinding, Binding, HIGHEST_FUNCTION_KEY, Hotkey, HotkeyEvent, Key, Modifier,
+    key_from_browser_code, suspend,
 };
 pub use inject::{InjectionMethod, TextInjector};
 pub use permissions::{Permission, PermissionState};
@@ -144,6 +145,34 @@ mod tests {
             key: Key::Function(9),
         };
         assert_eq!(bare.check(), Ok(()));
+    }
+
+    #[test]
+    fn browser_codes_name_the_physical_key() {
+        assert_eq!(Key::from_browser_code("Space"), Some(Key::Space));
+        assert_eq!(Key::from_browser_code("F9"), Some(Key::Function(9)));
+        assert_eq!(Key::from_browser_code("KeyD"), Some(Key::Character('d')));
+        assert_eq!(Key::from_browser_code("Digit7"), Some(Key::Character('7')));
+        // The keys the whole rebinding argument was actually about.
+        assert_eq!(Key::from_browser_code("Slash"), Some(Key::Character('/')));
+        assert_eq!(Key::from_browser_code("Comma"), Some(Key::Character(',')));
+        assert_eq!(Key::from_browser_code("Quote"), Some(Key::Character('\'')));
+        assert_eq!(
+            Key::from_browser_code("Backslash"),
+            Some(Key::Character('\\'))
+        );
+    }
+
+    #[test]
+    fn browser_codes_this_layer_does_not_know_are_left_to_the_platform() {
+        // Named keys with no portable spelling. The backend maps these; on a
+        // platform without one they are simply not bindable.
+        assert_eq!(Key::from_browser_code("Insert"), None);
+        assert_eq!(Key::from_browser_code("ArrowUp"), None);
+        // Beyond any keyboard, and not a key at all.
+        assert_eq!(Key::from_browser_code("F27"), None);
+        assert_eq!(Key::from_browser_code(""), None);
+        assert_eq!(Key::from_browser_code("KeyAB"), None);
     }
 
     #[test]

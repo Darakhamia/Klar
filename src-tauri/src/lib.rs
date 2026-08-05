@@ -45,7 +45,8 @@ pub fn run() {
             commands::model_download,
             commands::mic_test_start,
             commands::mic_test_stop,
-            commands::hotkey_capture,
+            commands::hotkey_suspend,
+            commands::hotkey_set,
             commands::ui_log,
             commands::onboarding_finish,
         ])

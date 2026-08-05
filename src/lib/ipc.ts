@@ -150,10 +150,22 @@ export const restartEngine = (): Promise<void> => invoke<void>("engine_restart")
 
 export const finishOnboarding = (): Promise<void> => invoke<void>("onboarding_finish");
 
-/** Wait for the user to press a chord and bind it, resolving with what was
- * bound. Rejects with the refusal — timed out, cancelled, or a chord Klar will
- * not take — written for a person. Takes as long as the user does. */
-export const captureHotkey = (): Promise<Binding> => invoke<Binding>("hotkey_capture");
+/** Stop or resume the push-to-talk hook while the window reads a chord. Without
+ * this the hook swallows the current hotkey before the window sees it, and
+ * starts a dictation instead. */
+export const suspendHotkey = (suspended: boolean): Promise<void> =>
+  invoke<void>("hotkey_suspend", { suspended });
+
+/**
+ * Bind the chord the window read, resolving with what it means.
+ *
+ * `code` is the `KeyboardEvent.code` verbatim — the physical key, not the
+ * character it produces. What that key is, and whether it can be bound, is
+ * decided in the platform layer; this reports what the browser said and
+ * nothing more. Rejects with the refusal, written for a person.
+ */
+export const setHotkey = (code: string, modifiers: Modifier[]): Promise<Binding> =>
+  invoke<Binding>("hotkey_set", { code, modifiers });
 
 const MODIFIER_GLYPHS: Record<Modifier, { mac: string; other: string }> = {
   control: { mac: "⌃", other: "Ctrl" },

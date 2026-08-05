@@ -110,7 +110,45 @@ is: a key that types a character needs a modifier, because bound bare the hook
 would swallow every one the user typed. A key that types nothing — a function
 key, Insert, an arrow — may be bound alone.
 
+### The hook is not handed keystrokes while Klar's own window has focus
+
+The user found it, after I had spent five rounds on threads, hook chains,
+capture flags and event delivery: **rebinding worked when the terminal window
+had focus and never when Klar's own window did.**
+
+That explains every measurement. The push-to-talk hook is fine — it is handed
+keys pressed at other applications, which is the only case dictation cares
+about. It is not handed keys pressed at Klar's window. And rebinding is the one
+feature where Klar's window necessarily has focus: the user just clicked a
+button in it.
+
+So rebinding does not use the hook at all. The settings window reads the chord
+from its own `keydown` events, which is what every application's shortcut picker
+does and what I should have written in the first place — a window that has focus
+is handed its own key events by definition, and no global hook is involved. It
+sends the `KeyboardEvent.code` and the modifiers to Rust, and the platform layer
+decides what key that is, so nothing about the keyboard is decided in
+TypeScript.
+
+The hook still has to stand down for the moment of capture: it would otherwise
+swallow the *current* hotkey before the window saw it, and start a dictation
+instead. That is `suspend`, one atomic and one branch.
+
+Everything else that came out of those five rounds is gone with it — the capture
+hook, the temporary hook, the chord atomics, the event counters, the hook
+census. It was all scaffolding around a hook that was never going to receive
+these keys.
+
+The lesson worth keeping is not about hooks. Two of my five rounds were spent
+confidently reporting causes I had inferred from Rust's logs alone, and one of
+those inferences was wrong in a way that took the investigation sideways. The
+thing that actually solved it was the user noticing which window had focus.
+
 ### Installing a second low-level keyboard hook silenced the first
+
+Superseded by the entry above — the second hook was never the problem — but kept
+because the measurement was real and the trap is still there for anything that
+installs one.
 
 The measurement, from one run:
 

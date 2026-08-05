@@ -12,7 +12,7 @@
 //!   Cmd+V via `CGEventPost`.
 
 use crate::{
-    Binding, Hotkey, HotkeyEvent, InjectionMethod, Permission, PermissionState, PlatformError,
+    Binding, Hotkey, HotkeyEvent, InjectionMethod, Key, Permission, PermissionState, PlatformError,
     TextInjector,
 };
 
@@ -47,8 +47,11 @@ pub fn set_launch_at_login(_on: bool) -> Result<(), PlatformError> {
     Err(PlatformError::NotImplemented("SMAppService login item"))
 }
 
-pub fn capture_binding(_timeout: std::time::Duration) -> Result<Binding, PlatformError> {
-    Err(PlatformError::NotImplemented("CGEventTap capture"))
+/// Nothing to stand down: there is no hook here to suspend.
+pub fn suspend(_suspended: bool) {}
+
+pub fn key_from_browser_code(_code: &str) -> Option<Key> {
+    None
 }
 
 struct MacHotkey;

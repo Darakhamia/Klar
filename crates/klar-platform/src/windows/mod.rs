@@ -16,7 +16,8 @@ mod inject;
 mod keys;
 
 pub use autostart::{launch_at_login, set_launch_at_login};
-pub use hotkey::capture_binding;
+pub use hotkey::suspend;
+pub use keys::key_from_browser_code;
 
 use crate::{Hotkey, Permission, PermissionState, PlatformError, TextInjector};
 
