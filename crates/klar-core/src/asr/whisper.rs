@@ -3,12 +3,14 @@
 //! The one thing this module has to get right beyond producing text is being
 //! honest about the backend. A build that quietly falls back to CPU still
 //! transcribes — it just misses the latency budget by an order of magnitude,
-//! and the cause will not surface until someone measures at M3. So the load
-//! path logs what was compiled in, what whisper.cpp reports about itself, and
-//! whether the GPU was requested, and it routes whisper.cpp's own device
-//! initialisation lines into our log rather than swallowing them.
+//! and nothing about the experience says why. So the load path logs what was
+//! compiled in, what whisper.cpp reports about itself, **and which devices ggml
+//! actually found** (see [`super::devices`]) — the last being the only one of
+//! the three that catches a CUDA build running on a machine with an AMD card.
+//! It also routes whisper.cpp's own device initialisation lines into our log
+//! rather than swallowing them.
 
-use super::{AsrError, Backend, TranscribeOptions, Transcriber, Transcript};
+use super::{Acceleration, AsrError, Backend, TranscribeOptions, Transcriber, Transcript};
 use crate::audio::SAMPLE_RATE;
 use std::path::Path;
 use std::sync::Once;
@@ -31,6 +33,9 @@ pub fn install_logging_hooks() {
 pub struct WhisperTranscriber {
     state: WhisperState,
     backend: Backend,
+    /// What ggml found, kept so the interface can say which device is doing the
+    /// work without probing a second time.
+    acceleration: Acceleration,
     default_threads: usize,
     /// English-only models (`*.en`) still run whisper's language detector if
     /// asked to, and it returns noise — a confident-looking `sq` at p = 0.01.
@@ -50,7 +55,11 @@ impl WhisperTranscriber {
             return Err(AsrError::ModelMissing(model.to_path_buf()));
         }
 
-        let backend = Backend::compiled();
+        // Asked before the context is built, because the answer decides what a
+        // slow first dictation means and the user should not have to wait for
+        // one to find out.
+        let acceleration = Acceleration::probe();
+        let backend = acceleration.compiled;
         let mut params = WhisperContextParameters::default();
         params.use_gpu(backend.is_gpu());
 
@@ -74,6 +83,7 @@ impl WhisperTranscriber {
         tracing::info!(
             backend = %backend,
             gpu_requested = backend.is_gpu(),
+            device = %acceleration.summary(),
             whisper_cpp = whisper_rs::WHISPER_CPP_VERSION,
             system_info = %system_info(),
             model = %model.display(),
@@ -83,19 +93,20 @@ impl WhisperTranscriber {
             "asr ready"
         );
 
-        if !backend.is_gpu() {
-            tracing::warn!(
-                "running whisper on the CPU — build with a GPU feature \
-                 (cuda on Windows, metal on macOS) or the latency budget will not be met"
-            );
-        }
+        acceleration.log();
 
         Ok(Self {
             state,
             backend,
+            acceleration,
             default_threads,
             multilingual,
         })
+    }
+
+    /// What this build asked for and what the machine gave it.
+    pub const fn acceleration(&self) -> &Acceleration {
+        &self.acceleration
     }
 }
 

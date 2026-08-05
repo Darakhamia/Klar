@@ -7,6 +7,57 @@ Newest first.
 
 ---
 
+## M7 — shipping
+
+### "Which backend was compiled" is not "which device was found"
+
+`Backend::compiled()` answers a build question and I had been treating it as an
+answer about the machine. It is not the same question, and they come apart in
+the case that matters most: a CUDA build on a computer with an AMD card. The
+bundled `cudart64_*.dll` loads, `cudaGetDeviceCount` finds nothing, ggml falls
+back to the CPU, and the app installs, starts, transcribes and is roughly ten
+times slower — with `asr ready backend=cuda` in the log, which is true and
+completely misleading.
+
+Nothing in the pipeline noticed. The module that logs the backend opens with a
+comment about how a silent CPU fallback is the failure this project must not
+have, and it could not see this one, because it was reporting a `cfg!` rather
+than asking anything.
+
+ggml keeps a registry of the devices its compiled backends actually found, and
+`whisper-rs-sys` binds it: `ggml_backend_dev_count`, `_get`, `_name`,
+`_description`, `_type`, `_memory`. Reading it costs nothing, works before any
+model is loaded, and turns the log line into `built for cuda, found no GPU`.
+That lives in `klar-core::asr::devices` and surfaces in three places — the log,
+`klar-cli doctor`, and Settings → Voice → Processing.
+
+The registry is populated during static initialisation of the linked ggml, so
+it can be read before a `WhisperContext` exists. This is deliberate: the answer
+decides what to tell somebody whose model has not finished downloading, and
+making them wait for a slow first dictation to find out is the situation being
+fixed.
+
+Integrated graphics register as `GGML_BACKEND_DEVICE_TYPE_IGPU`, separate from
+`GPU`. Counted as acceleration — it is — but worth telling apart when
+explaining a disappointing measurement on a laptop.
+
+### Vulkan is the portable backend, and it costs nothing to ship
+
+whisper.cpp's Vulkan backend runs on AMD, Intel and NVIDIA. It needs `glslc`
+from the Vulkan SDK at build time, and at runtime it needs nothing at all: the
+loader `vulkan-1.dll` is installed by the graphics driver, and the shaders are
+compiled into the binary. So a Vulkan installer carries none of the ~250 MB of
+NVIDIA runtime a CUDA one does.
+
+The feature was declared in both manifests from M1 and had never been compiled.
+It builds — verified on Linux with `libvulkan-dev` and `glslc`, which is enough
+to prove the feature wiring and the shader step, and not enough to say anything
+about latency. Its speed against CUDA on the same card is unmeasured, and until
+somebody runs `klar-cli --features vulkan dictate` on real hardware, "Vulkan
+works" means it runs.
+
+---
+
 ## M6 — interface
 
 ### "Type and copy" cannot be an inject followed by a copy

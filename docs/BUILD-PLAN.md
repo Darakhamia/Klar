@@ -107,6 +107,22 @@ with a missing-DLL box, before any of our code can explain itself. `build.rs`
 now collects those three libraries and the bundle carries them beside the
 executable, so the criterion is reachable.
 
+"A machine that has never had a developer toolchain on it" turned out to hide a
+second assumption: that the machine has an NVIDIA card. A CUDA build on a
+computer with an AMD one clears the criterion as written — it installs and it
+runs — while running every transcription on the CPU at roughly ten times the
+budget. Two things came out of that:
+
+- **The mismatch is now visible.** `klar-core::asr::devices` reads ggml's device
+  registry at model load and names what will actually do the work, in the log,
+  in `klar-cli doctor`, and in Settings → Voice → Processing. M1's "log which
+  backend was selected" was answering a `cfg!`, not the machine.
+- **There is a portable build.** `--features vulkan` covers AMD, Intel and
+  NVIDIA, needs no redistributable runtime, and compiles. Whether it meets M3's
+  latency criterion is unmeasured — the `vulkan` feature had existed unbuilt
+  since M1 — so it is not yet a replacement for the CUDA build, only an answer
+  for machines the CUDA build cannot serve.
+
 Signing is configured and unsigned. The digest and the RFC 3161 timestamp URL
 are set — the timestamp being the part people forget, without which a signature
 dies with its certificate — and only the thumbprint is missing, because a

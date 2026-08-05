@@ -27,6 +27,41 @@ pub fn app_version() -> AppVersion {
     }
 }
 
+/// Which device speech is recognised on, and what is wrong if it is the CPU.
+///
+/// The interface asks because the answer is the difference between Klar being
+/// instant and Klar taking several seconds a sentence, and because the reason
+/// is never visible from inside the app: an installer built for CUDA runs
+/// perfectly on a machine with an AMD card, finds no CUDA device, quietly falls
+/// back to the CPU, and every dictation is ten times slower with nothing to say
+/// so. This turns that into a sentence in Settings.
+///
+/// Probed rather than cached: it costs a registry read, and it is asked once
+/// when a settings window opens.
+#[tauri::command]
+pub fn acceleration() -> AccelerationReport {
+    let probed = klar_core::asr::Acceleration::probe();
+    AccelerationReport {
+        accelerated: probed.accelerated(),
+        summary: probed.summary(),
+        // The wording is written once, in klar-core, and shown by whoever asks
+        // — the log, `klar-cli doctor`, and this window all say the same thing.
+        warning: probed.warning(),
+        devices: probed.found,
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccelerationReport {
+    accelerated: bool,
+    /// One line naming the device: `NVIDIA GeForce RTX 4070 (cuda)`.
+    summary: String,
+    /// Why it is slow, when it is. `None` when there is nothing wrong.
+    warning: Option<String>,
+    devices: Vec<klar_core::asr::Device>,
+}
+
 /// The push-to-talk binding a fresh install starts on: Ctrl + Space on Windows,
 /// ⌥ Space on macOS.
 #[tauri::command]

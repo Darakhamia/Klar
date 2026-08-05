@@ -66,6 +66,31 @@ export interface PolishStatus {
 
 export const polishStatus = (): Promise<PolishStatus> => invoke<PolishStatus>("polish_status");
 
+/** A compute device ggml found — a graphics card, integrated graphics, or the
+ * CPU. Not to be confused with {@link Device}, which is a microphone. */
+export interface ComputeDevice {
+  name: string;
+  description: string;
+  kind: "cpu" | "gpu" | "integratedGpu" | "accelerator" | "unknown";
+  memory: number | null;
+}
+
+/**
+ * What is actually doing the speech recognition.
+ *
+ * `warning` is written in Rust and shown verbatim: a build made for one
+ * vendor's card running on another's works perfectly and runs on the CPU, and
+ * this is the only place in the interface that difference is visible.
+ */
+export interface Acceleration {
+  accelerated: boolean;
+  summary: string;
+  warning: string | null;
+  devices: ComputeDevice[];
+}
+
+export const acceleration = (): Promise<Acceleration> => invoke<Acceleration>("acceleration");
+
 /** The languages worth offering. Whisper knows a hundred; nobody needs a
  * hundred-item menu, and `null` covers everything else by detecting. */
 export const LANGUAGES: { code: string | null; label: string }[] = [

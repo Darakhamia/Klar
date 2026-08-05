@@ -4,8 +4,10 @@
 //! the one-shot implementation here for a streaming one without touching
 //! anything above it.
 
+pub mod devices;
 pub mod whisper;
 
+pub use devices::{Acceleration, Device, DeviceKind};
 pub use whisper::WhisperTranscriber;
 
 use std::time::Duration;
@@ -27,8 +29,10 @@ pub enum AsrError {
 
 /// Which compute backend whisper.cpp was built against.
 ///
-/// This is what the build asked for. Whether the GPU was actually used is a
-/// separate question the log answers — see [`whisper::WhisperTranscriber::load`].
+/// This is what the build asked for, and it is only half the answer: a CUDA
+/// build on a machine with an AMD card is still `Cuda` here while every
+/// transcription runs on the CPU. [`Acceleration::probe`] asks ggml what it
+/// actually found, and that is the one to show a user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Backend {

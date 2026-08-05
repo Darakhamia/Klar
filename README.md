@@ -23,6 +23,14 @@ Not built: the dictionary, history and statistics, which need the database in
 M5, and the cloud path for machines without a usable GPU. Both say so in the
 interface rather than being offered and doing nothing.
 
+**Not only NVIDIA.** The GPU backend is a compile-time choice, so there is a
+CUDA build and a Vulkan one, and Vulkan covers AMD, Intel and NVIDIA alike. What
+mattered more than adding it was noticing when it is wrong: a CUDA build on a
+machine with an AMD card starts, works, silently runs on the CPU and is ten
+times slower. Klar reads ggml's device registry at load and names the device
+that will do the work — in the log, in `klar-cli doctor`, and in Settings. See
+[Which GPU build](#which-gpu-build).
+
 **M3 passed on Windows.** Transcription runs during speech and commits at
 pauses, so key release leaves only the tail: median 260 ms from key-up to
 inserted text against a 500 ms criterion. A 22-second dictation streams 21.8 s
@@ -67,6 +75,7 @@ the first build — each one missing produces an error that does not name it.
 | CMake | whisper.cpp is a CMake project. Visual Studio bundles a copy, but only inside its own directory — it is not on `PATH`, so install it standalone | `winget install Kitware.CMake` |
 | LLVM | `bindgen` needs `libclang.dll` to generate the whisper.cpp bindings | `winget install LLVM.LLVM` |
 | CUDA Toolkit | Only for `--features cuda`. Blackwell (RTX 50xx) needs 12.8+ | `winget install Nvidia.CUDA` |
+| Vulkan SDK | Only for `--features vulkan`. It is `glslc` that is needed — whisper.cpp compiles its shaders at build time | `winget install KhronosGroup.VulkanSDK` |
 | WebView2 | The Tauri window. Already present on Windows 11 | [Download](https://developer.microsoft.com/microsoft-edge/webview2/) |
 
 Open a new terminal afterwards: `CUDA_PATH` and the LLVM path only reach
@@ -99,15 +108,18 @@ checkout takes a few minutes and needs `cmake` on the PATH.
 # Build with the GPU your machine actually has. Without a feature flag you get
 # a CPU build, which works and misses the latency budget by an order of
 # magnitude — deliberately loud rather than silent.
-cargo build -p klar-cli --features cuda      # Windows, NVIDIA
+cargo build -p klar-cli --features cuda      # Windows, NVIDIA only
+cargo build -p klar-cli --features vulkan    # Windows, any card — AMD, Intel, NVIDIA
 cargo build -p klar-cli --features metal     # macOS
 
 cargo run -p klar-cli --features cuda -- model download
 cargo run -p klar-cli --features cuda -- listen --seconds 5
 ```
 
-`doctor` prints the backend and `listen` prints the real-time factor, so a
-build that quietly fell back to CPU is visible immediately rather than at M3.
+`doctor` names the device the work will land on and `listen` prints the
+real-time factor, so a build running on the CPU is visible immediately rather
+than at M3. The two are separate questions and `doctor` answers both — see
+[Which GPU build](#which-gpu-build).
 
 ### Polishing
 
@@ -175,6 +187,41 @@ misses the latency budget by an order of magnitude. The extra `--config` is what
 packages the CUDA runtime — see below. Leave both off and you get a working CPU
 installer.
 
+### Which GPU build
+
+The backend is chosen at compile time, so one binary cannot cover every machine.
+There are three answers and they are not equal:
+
+| Build | Runs on | Needs at build time | Carries at runtime |
+|---|---|---|---|
+| `--features cuda` | NVIDIA only | CUDA Toolkit | ~250 MB of NVIDIA runtime, bundled |
+| `--features vulkan` | AMD, Intel, NVIDIA | Vulkan SDK (`glslc`) | nothing — `vulkan-1.dll` comes with the graphics driver |
+| no feature | anything | nothing | nothing |
+
+**A CUDA build on a machine without an NVIDIA card is the trap.** It installs,
+it starts, it transcribes, and ggml falls back to the CPU — so it is roughly ten
+times slower and nothing about it looks broken. Klar now says so out loud:
+`Acceleration::probe` reads ggml's device registry at model load, and the answer
+appears in the log, in `klar-cli doctor`, and in Settings → Voice → Processing,
+which reads *On this PC — NVIDIA GeForce RTX 4070 (cuda)* when it is right and
+explains the mismatch when it is not.
+
+```sh
+cargo run -p klar-cli --features vulkan -- doctor      # what did ggml find?
+cargo run -p klar-cli --features vulkan -- dictate     # what does it cost?
+```
+
+Vulkan is the portable answer and the one to build for anybody who is not on
+NVIDIA. It compiles and its device probe is exercised in CI; **its latency on
+real hardware has not been measured yet**, and until it has, "Vulkan works" means
+it runs, not that it meets the budget in CLAUDE.md. Measure with `dictate`, which
+prints the time from key-up to inserted text — the number that matters — before
+deciding whether one Vulkan installer can replace two.
+
+Two installers built from the same version produce the same filename, so rename
+them (`Klar_x.y.z_x64-setup.exe` → `…-cuda-setup.exe`, `…-vulkan-setup.exe`)
+before publishing both.
+
 ### Why the CUDA runtime is bundled
 
 whisper.cpp links `cudart`, `cublas` and `cublasLt` dynamically, so a machine
@@ -190,6 +237,11 @@ with an application.
 
 They are in a separate config file because Tauri treats a resource glob that
 matches nothing as an error, and a CPU build has nothing to match.
+
+A Vulkan build needs none of this and takes the plain config: the loader,
+`vulkan-1.dll`, is installed by the graphics driver on every machine that has a
+GPU worth using, and the shaders are compiled into the binary at build time.
+That is a quarter of a gigabyte the installer does not carry.
 
 ### Code signing
 

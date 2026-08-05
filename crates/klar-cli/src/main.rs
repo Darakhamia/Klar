@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use klar_core::asr::{Backend, TranscribeOptions, Transcriber, WhisperTranscriber};
+use klar_core::asr::{TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
 use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
@@ -282,12 +282,24 @@ fn doctor() -> Result<()> {
         );
     }
 
-    let backend = Backend::compiled();
-    println!("asr backend   {backend}");
-    if !backend.is_gpu() {
-        println!(
-            "              ^ CPU build. Rebuild with --features cuda (Windows) or metal (macOS)."
-        );
+    let acceleration = klar_core::asr::Acceleration::probe();
+    println!("asr backend   {}", acceleration.compiled);
+    for device in &acceleration.found {
+        let marker = if Some(device) == acceleration.device.as_ref() {
+            "*"
+        } else {
+            " "
+        };
+        let memory = device
+            .memory
+            .map(|bytes| format!("  {} MB", bytes / (1024 * 1024)))
+            .unwrap_or_default();
+        println!("device      {marker} {device}{memory}");
+    }
+    // The line that separates "built for the wrong card" from "built without a
+    // card", which the backend name alone cannot do.
+    if let Some(warning) = acceleration.warning() {
+        println!("              ^ {warning}");
     }
     println!("whisper.cpp   {}", klar_core::asr::whisper::system_info());
 

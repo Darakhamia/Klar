@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Row, Segmented, Select } from "../components/Row";
-import type { Cleanup, Device, ModelStatus, Settings } from "../lib/settings";
-import { LANGUAGES, polishStatus, type PolishStatus } from "../lib/settings";
+import type { Acceleration, Cleanup, Device, ModelStatus, Settings } from "../lib/settings";
+import { LANGUAGES, acceleration, polishStatus, type PolishStatus } from "../lib/settings";
 
 /** The example from the design, showing what each cleanup strength does. */
 const SAID =
@@ -33,12 +33,7 @@ export function Voice({
 
   return (
     <>
-      <Row
-        label="Processing"
-        hint="Speech is recognised on this machine and never leaves it. A cloud option is planned for computers without a usable GPU; it is not built, so it is not offered."
-      >
-        <span className="figure">On this PC</span>
-      </Row>
+      <Processing />
 
       <Row
         label="Model"
@@ -121,6 +116,45 @@ export function Voice({
         </p>
       </div>
     </>
+  );
+}
+
+/**
+ * Where speech is processed, and on what.
+ *
+ * The row used to read "On this PC" and stop there, which is true and useless:
+ * an installer built for CUDA runs perfectly on a machine with an AMD card,
+ * finds no CUDA device, falls back to the CPU, and every dictation takes
+ * several seconds with nothing anywhere saying why. Naming the device turns
+ * that into something a person can act on.
+ */
+function Processing() {
+  const [state, setState] = useState<Acceleration | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    acceleration()
+      .then((probed) => {
+        if (!cancelled) setState(probed);
+      })
+      .catch(() => {
+        // Not knowing is not worth an error in a settings window — the row
+        // falls back to what it said before there was a probe.
+        if (!cancelled) setState(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hint =
+    state?.warning ??
+    "Speech is recognised on this machine and never leaves it. A cloud option is planned for computers without a usable GPU; it is not built, so it is not offered.";
+
+  return (
+    <Row label="Processing" hint={hint} alert={state?.warning != null}>
+      <span className="figure">{state ? `On this PC — ${state.summary}` : "On this PC"}</span>
+    </Row>
   );
 }
 

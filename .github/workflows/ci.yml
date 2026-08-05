@@ -47,6 +47,39 @@ jobs:
 
       - run: npm run build
 
+  # The portable GPU backend — AMD, Intel and NVIDIA alike, and the only answer
+  # for a machine without CUDA. It is here for the same reason macOS is in the
+  # desktop matrix: the `vulkan` feature was declared at M1 and had never once
+  # been compiled by the time it was needed, which is how a build option rots.
+  #
+  # Linux is not a target. This job is not claiming otherwise — it compiles the
+  # shaders and the backend, which is what actually breaks, and it costs a
+  # fraction of a Windows runner. Latency is measured on real hardware, never
+  # here.
+  vulkan:
+    name: Vulkan backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      # glslc compiles whisper.cpp's shaders at build time; libvulkan-dev is the
+      # loader it links against. No GPU is needed to build either.
+      - run: >
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          libasound2-dev libvulkan-dev glslc
+
+      - run: cargo clippy -p klar-core --features vulkan --all-targets -- -D warnings
+
+      # The device probe runs against a real ggml registry — on a runner with no
+      # GPU, which is exactly the case it has to describe honestly.
+      - run: cargo test -p klar-core --features vulkan
+
   # The real thing. Windows ships first; macOS is in the matrix from the start
   # so its backend cannot silently rot while Windows is being built out.
   desktop:

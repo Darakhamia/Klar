@@ -2,6 +2,10 @@
 //!
 //! Beyond Tauri's own codegen there is one job: collecting the CUDA runtime
 //! libraries the bundled application will need, so the installer can carry them.
+//!
+//! Only CUDA. The Vulkan backend needs nothing here — its loader ships with the
+//! graphics driver and its shaders are compiled into the binary — which is one
+//! of the reasons a Vulkan installer is a quarter of a gigabyte smaller.
 
 use std::path::{Path, PathBuf};
 

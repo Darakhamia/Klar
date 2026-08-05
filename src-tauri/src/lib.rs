@@ -34,6 +34,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::app_version,
+            commands::acceleration,
             commands::default_hotkey,
             commands::permission_states,
             commands::audio_devices,
