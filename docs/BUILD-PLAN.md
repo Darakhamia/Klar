@@ -118,10 +118,11 @@ budget. Two things came out of that:
   in `klar-cli doctor`, and in Settings → Voice → Processing. M1's "log which
   backend was selected" was answering a `cfg!`, not the machine.
 - **There is a portable build.** `--features vulkan` covers AMD, Intel and
-  NVIDIA, needs no redistributable runtime, and compiles. Whether it meets M3's
-  latency criterion is unmeasured — the `vulkan` feature had existed unbuilt
-  since M1 — so it is not yet a replacement for the CUDA build, only an answer
-  for machines the CUDA build cannot serve.
+  NVIDIA, needs no redistributable runtime, and measures 307 ms from key-up to
+  inserted text on an RTX 5070 Ti against M3's 500 ms — beside a 260 ms median
+  for CUDA on the same machine. Two dictations rather than M3's twenty, so it
+  is a reading and not a pass; deciding whether one Vulkan installer replaces
+  two needs the full set, and on an AMD card, which nobody here has.
 
 Signing is configured and unsigned. The digest and the RFC 3161 timestamp URL
 are set — the timestamp being the part people forget, without which a signature

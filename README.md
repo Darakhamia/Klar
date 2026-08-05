@@ -276,11 +276,17 @@ cargo run -p klar-cli --features vulkan -- dictate     # what does it cost?
 ```
 
 Vulkan is the portable answer and the one to build for anybody who is not on
-NVIDIA. It compiles and its device probe is exercised in CI; **its latency on
-real hardware has not been measured yet**, and until it has, "Vulkan works" means
-it runs, not that it meets the budget in CLAUDE.md. Measure with `dictate`, which
-prints the time from key-up to inserted text — the number that matters — before
-deciding whether one Vulkan installer can replace two.
+NVIDIA. It compiles, its device probe is exercised in CI, and it runs: on an
+RTX 5070 Ti it took **307 ms** from key-up to inserted text against a 500 ms
+criterion, on the same machine where CUDA measures a 260 ms median. Two
+dictations is not M3's twenty, so treat that as a first reading rather than a
+result — but it is the right order of magnitude, which is what the decision
+between one installer and two rests on.
+
+The first dictation on that run took **17.4 seconds**. Vulkan compiles its
+compute pipelines the first time each shader is used, and loading a model
+touches none of them, so the cost landed on whoever spoke first. It is now paid
+inside model load instead — see `WhisperTranscriber::warm`.
 
 Two installers built from the same version produce the same filename, so rename
 them (`Klar_x.y.z_x64-setup.exe` → `…-cuda-setup.exe`, `…-vulkan-setup.exe`)

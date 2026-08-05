@@ -95,13 +95,56 @@ impl WhisperTranscriber {
 
         acceleration.log();
 
-        Ok(Self {
+        let mut transcriber = Self {
             state,
             backend,
             acceleration,
             default_threads,
             multilingual,
-        })
+        };
+
+        let warm = transcriber.warm();
+        tracing::info!(
+            backend = %backend,
+            warm_ms = warm.as_millis() as u64,
+            "warm-up pass done; the first dictation pays no start-up cost"
+        );
+
+        Ok(transcriber)
+    }
+
+    /// Run one throwaway inference, so the first real dictation is not the one
+    /// that pays for the first inference.
+    ///
+    /// Vulkan compiles its compute pipelines lazily, the first time each shader
+    /// is used, and loading a model touches none of them. Measured on an
+    /// RTX 5070 Ti: the model loaded in 873 ms, the first dictation then took
+    /// 17.4 seconds against a 500 ms criterion, and the second took 307 ms.
+    /// CUDA pays a smaller version of the same cost.
+    ///
+    /// That cost cannot be removed, only moved. It belongs here, inside a load
+    /// the interface already reports as loading, rather than in somebody's
+    /// first sentence — where it does not look like start-up, it looks broken.
+    ///
+    /// A second of silence: whisper pads anything shorter than its 30-second
+    /// window regardless, so this is a full encoder pass. The language is
+    /// pinned rather than detected, which keeps the pass bounded — the
+    /// detector's answer for silence is noise, and the transcript is discarded
+    /// either way.
+    pub fn warm(&mut self) -> Duration {
+        let silence = vec![0.0_f32; SAMPLE_RATE as usize];
+        let options = TranscribeOptions {
+            language: Some("en".to_owned()),
+            ..TranscribeOptions::default()
+        };
+
+        let started = Instant::now();
+        if let Err(error) = self.transcribe(&silence, &options) {
+            // Costs the head start and nothing else: the dictation path reports
+            // its own failures, and a model that cannot run will say so there.
+            tracing::warn!(%error, "warm-up pass failed; the first dictation will be slow");
+        }
+        started.elapsed()
     }
 
     /// What this build asked for and what the machine gave it.

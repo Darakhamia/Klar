@@ -50,11 +50,35 @@ compiled into the binary. So a Vulkan installer carries none of the ~250 MB of
 NVIDIA runtime a CUDA one does.
 
 The feature was declared in both manifests from M1 and had never been compiled.
-It builds — verified on Linux with `libvulkan-dev` and `glslc`, which is enough
-to prove the feature wiring and the shader step, and not enough to say anything
-about latency. Its speed against CUDA on the same card is unmeasured, and until
-somebody runs `klar-cli --features vulkan dictate` on real hardware, "Vulkan
-works" means it runs.
+It builds, and on an RTX 5070 Ti it runs at 307 ms from key-up to inserted text
+against a 500 ms criterion — where CUDA on the same machine measures a 260 ms
+median. Two dictations, so a first reading rather than M3's twenty, and the
+right order of magnitude for the decision it feeds.
+
+`whisper_print_system_info` says nothing about Vulkan. The CUDA build reports
+`CUDA : ARCHS = 1200`; the Vulkan build's line is indistinguishable from a CPU
+build's. Without the device registry above, this backend would have looked like
+no backend at all.
+
+### Vulkan compiles its shaders on first use, not at load
+
+The first dictation of a Vulkan run took 17.4 seconds. The second took 307 ms.
+Not variance — Vulkan builds its compute pipelines lazily, the first time each
+shader is needed, and loading a model touches none of them: the model loaded in
+873 ms and reported itself ready with every pipeline still uncompiled.
+
+The cost cannot be removed, only moved. `WhisperTranscriber::load` now runs one
+throwaway inference over a second of silence before returning, so it is paid
+where the interface already says the model is loading rather than in somebody's
+first sentence — 17 seconds of "loading" reads as start-up; 17 seconds after
+releasing the hotkey reads as broken.
+
+The language is pinned for that pass rather than detected. Detection on silence
+returns noise, and the throwaway transcript is discarded regardless; pinning
+keeps the pass bounded instead of letting the decoder wander through a
+30-second window of zeros.
+
+CUDA pays a smaller version of the same cost and now pays it in the same place.
 
 Two Windows traps sit between installing the SDK and getting a build, and both
 report themselves as something else:
