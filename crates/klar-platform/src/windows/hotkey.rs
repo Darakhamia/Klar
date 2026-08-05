@@ -163,6 +163,16 @@ static CAPTURED_MODIFIERS: AtomicU8 = AtomicU8::new(0);
 /// distinguish.
 static SEEN: AtomicU32 = AtomicU32::new(0);
 
+/// Every key event the push-to-talk hook has been handed since it was
+/// installed, capture or no capture.
+///
+/// This separates two failures that look identical from outside. If a capture
+/// times out with this at zero, no hook in this process has ever received a
+/// keystroke — the hotkey itself is dead and rebinding is a symptom. If it is
+/// large and the capture still saw nothing, keys are arriving right up until a
+/// capture starts, which is a different problem entirely.
+static HOOK_SEEN: AtomicU32 = AtomicU32::new(0);
+
 /// How often the waiting thread looks at [`CAPTURED`]. Fine for something a
 /// person is about to do with their hand.
 const POLL: Duration = Duration::from_millis(10);
@@ -233,7 +243,11 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     // the one that actually gets the keystrokes.
     let own = TemporaryHook::install();
     match &own {
-        Ok(_) => tracing::info!(?timeout, "capture armed; waiting for a chord"),
+        Ok(_) => tracing::info!(
+            ?timeout,
+            push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
+            "capture armed; waiting for a chord"
+        ),
         // Not fatal on its own: the push-to-talk hook may still deliver. Said
         // out loud, because if nothing else is hooked this capture is doomed.
         Err(error) => {
@@ -246,6 +260,7 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
         if Instant::now() >= deadline {
             tracing::warn!(
                 seen = SEEN.load(Ordering::SeqCst),
+                push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
                 "capture timed out; key events the hooks were handed"
             );
             return Err(BadBinding::TimedOut.into());
@@ -419,6 +434,10 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         // SAFETY: forwarding the parameters we were given, unmodified.
         return unsafe { CallNextHookEx(None, code, wparam, lparam) };
     }
+
+    // Counted before anything else, so "is this hook alive at all" has an
+    // answer that does not depend on what the key was.
+    HOOK_SEEN.fetch_add(1, Ordering::Relaxed);
 
     // A capture is running. This hook takes it rather than standing aside: in
     // the app it is the one being handed keystrokes, and push-to-talk has
