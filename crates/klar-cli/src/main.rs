@@ -45,6 +45,8 @@ enum Command {
     Inject(InjectArgs),
     /// Watch the push-to-talk hotkey and print its events.
     Hotkey,
+    /// Capture one chord and print what it would be bound to. Nothing is saved.
+    Rebind,
     /// Hold the hotkey, speak, release, and the text lands in the focused app.
     /// The M2 acceptance criterion end to end.
     Dictate(DictateArgs),
@@ -209,6 +211,7 @@ async fn main() -> Result<()> {
         Command::Vad(args) => vad(&args),
         Command::Inject(args) => inject(&args),
         Command::Hotkey => hotkey(),
+        Command::Rebind => rebind(),
         Command::Dictate(args) => dictate(&args),
         Command::Model(command) => model_command(command).await,
         Command::DryRun => dry_run(),
@@ -618,6 +621,29 @@ fn hotkey() -> Result<()> {
                 println!("up    (held {held} ms)");
             }
         }
+    }
+    Ok(())
+}
+
+/// Capture one chord, exactly as the settings window's Change button does, and
+/// print what came back.
+///
+/// The point of having this here: the app's version of rebinding runs through a
+/// Tauri command, a background thread, a stopped engine and two events before
+/// anything reaches the screen. This runs the platform call and nothing else, so
+/// a failure here and a failure there are different problems.
+fn rebind() -> Result<()> {
+    const WAIT: Duration = Duration::from_secs(10);
+
+    println!("press a chord — a modifier and a letter, digit, Space or F-key.");
+    println!("Escape cancels. {} seconds.", WAIT.as_secs());
+
+    match klar_platform::capture(WAIT) {
+        Ok(binding) => {
+            println!("captured  {binding:?}");
+            println!("would be saved as the push-to-talk binding.");
+        }
+        Err(error) => println!("refused   {error}"),
     }
     Ok(())
 }

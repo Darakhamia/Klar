@@ -5,6 +5,7 @@ import {
   captureHotkey,
   formatBinding,
   subscribe,
+  type Binding,
   type CaptureResult,
 } from "../lib/ipc";
 import type { Appearance, FinishAction, OverlayPosition, Settings } from "../lib/settings";
@@ -86,22 +87,44 @@ export function General({
 /**
  * The push-to-talk binding, and rebinding it.
  *
- * No `onChange` here: Rust saves the captured chord and restarts the engine on
- * it before it tells anyone, and the settings broadcast that follows is what
- * updates this row. Saving it again from here would restart the engine twice.
+ * No `onChange`: Rust saves the captured chord and restarts the engine on it
+ * before it tells anyone, so saving again from here would restart the engine
+ * twice. The row shows what the capture itself reported rather than waiting for
+ * the settings broadcast to come back round — one less link between pressing a
+ * key and seeing it.
  */
 function Hotkey({ settings, os }: { settings: Settings; os: string }) {
   const [capturing, setCapturing] = useState(false);
+  const [bound, setBound] = useState<Binding | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
 
   useEffect(
     () =>
       subscribe<CaptureResult>(HOTKEY_EVENT, (result) => {
         setCapturing(false);
-        setRefused(result.outcome === "refused" ? result.message : null);
+        if (result.outcome === "bound") {
+          setBound(result.binding);
+          setRefused(null);
+        } else {
+          setRefused(result.message);
+        }
       }),
     [],
   );
+
+  // Capture answers within its own ten-second limit, so silence past that is
+  // not the user being slow — it is nothing coming back. Better to say so than
+  // to leave a disabled button reading "Press a key…" for ever.
+  useEffect(() => {
+    if (!capturing) return;
+    const timer = window.setTimeout(() => {
+      setCapturing(false);
+      setRefused("No answer from the engine. Check the log for `rebinding:`.");
+    }, 15_000);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [capturing]);
 
   // While capturing there is no hotkey at all — the engine is stopped so its
   // hook cannot race the capture — so the row says what to do rather than
@@ -112,7 +135,7 @@ function Hotkey({ settings, os }: { settings: Settings; os: string }) {
 
   return (
     <Row label="Dictation hotkey" hint={hint} alert={refused !== null && !capturing}>
-      <Figure>{formatBinding(settings.hotkey, os)}</Figure>
+      <Figure>{formatBinding(bound ?? settings.hotkey, os)}</Figure>
       <button
         type="button"
         className="btn btn--ghost"
