@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { appVersion, inShell, type AppVersion } from "./lib/ipc";
+import { ENGINE_EVENT, appVersion, inShell, type AppVersion, type EngineEvent } from "./lib/ipc";
 import {
   getSettings,
   listDevices,
@@ -62,13 +62,9 @@ export function App() {
   // second audio stream open just to draw a bar.
   useEffect(() => {
     if (!inShell()) return;
-    const pending = listen<{ kind: string; peak?: number }>("klar://event", ({ payload }) => {
-      if (payload.kind === "level" && typeof payload.peak === "number") {
-        setLevel(payload.peak);
-      }
-      if (payload.kind === "state") {
-        setLevel(0);
-      }
+    const pending = listen<EngineEvent>(ENGINE_EVENT, ({ payload }) => {
+      if (payload.kind === "level") setLevel(payload.peak);
+      if (payload.kind === "state") setLevel(0);
     });
     return () => {
       void pending.then((unlisten) => {

@@ -81,6 +81,11 @@ npm run tauri dev -- --features cuda   # the app, on the GPU
 cargo run -p klar-cli -- doctor    # OS, audio devices, ASR backend, models
 ```
 
+First launch opens onboarding: it tests the microphone, downloads the speech
+model with a progress bar, and ends on a text box you dictate into. Nothing
+below is needed to get the app working — the CLI is the harness the pipeline is
+built and measured in.
+
 ### Dictating from the command line
 
 whisper.cpp is built from source, so the first `cargo build` after a clean

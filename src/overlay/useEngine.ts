@@ -8,22 +8,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { ENGINE_EVENT, type EngineEvent, type PipelineState } from "../lib/ipc";
 
-export type PipelineState =
-  | "idle"
-  | "recording"
-  | "transcribing"
-  | "polishing"
-  | "injecting"
-  | "error";
-
-type EngineEvent =
-  | { kind: "state"; state: PipelineState }
-  | { kind: "level"; peak: number }
-  | { kind: "text"; text: string; settled: boolean }
-  | { kind: "failed"; message: string }
-  | { kind: "loading"; what: string }
-  | { kind: "ready"; hotkey: string };
+export type { PipelineState };
 
 /** How many level readings the waveform shows at once. */
 export const BARS = 12;
@@ -50,7 +37,7 @@ export function useEngine(): Engine {
   const startedAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const pending = listen<EngineEvent>("klar://event", ({ payload }) => {
+    const pending = listen<EngineEvent>(ENGINE_EVENT, ({ payload }) => {
       switch (payload.kind) {
         case "state":
           setState(payload.state);

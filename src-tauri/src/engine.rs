@@ -10,7 +10,7 @@ use klar_core::audio::{self, BlockConverter, Capture, CaptureConfig};
 use klar_core::stream::{Stream, StreamConfig, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine, State, StateEvent, model};
-use klar_platform::HotkeyEvent;
+use klar_platform::{Binding, HotkeyEvent};
 use serde::Serialize;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -37,17 +37,18 @@ pub enum UiEvent {
     Failed { message: String },
     /// Models are still loading; the hotkey will not do anything yet.
     Loading { what: String },
-    /// Everything is loaded and the hotkey is live.
-    Ready { hotkey: String },
+    /// Everything is loaded and the hotkey is live. Onboarding waits on this
+    /// before offering its test field.
+    Ready { hotkey: Binding },
 }
 
-/// Settings the engine reads. Written by the settings window in a later slice;
-/// for now these are the defaults the CLI proved out.
+/// Settings the engine reads.
 #[derive(Debug, Clone)]
 pub struct EngineConfig {
     pub model: String,
     pub language: Option<String>,
     pub device: Option<String>,
+    pub hotkey: Binding,
     pub stream: StreamConfig,
 }
 
@@ -57,6 +58,7 @@ impl Default for EngineConfig {
             model: model::DEFAULT_MODEL.to_owned(),
             language: None,
             device: None,
+            hotkey: klar_platform::default_binding(),
             stream: StreamConfig::default(),
         }
     }
@@ -68,6 +70,7 @@ impl From<&crate::settings::Settings> for EngineConfig {
             model: settings.model.clone(),
             language: settings.language.clone(),
             device: settings.microphone.clone(),
+            hotkey: settings.hotkey.clone(),
             stream: StreamConfig::default(),
         }
     }
@@ -138,12 +141,10 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
     let vad_path = model::path_in(&dir, vad_spec);
 
     if !model_path.is_file() || !vad_path.is_file() {
-        // Onboarding downloads these. Until it exists, say plainly what is
-        // missing rather than failing at the first hotkey press.
-        return Err(format!(
-            "models are not installed yet — run `klar-cli model download` and `klar-cli model download {}`",
-            vad_spec.id
-        ));
+        // Onboarding downloads these and restarts the engine. Said here rather
+        // than left to fail at the first hotkey press, which would look like
+        // the hotkey not working.
+        return Err("the speech model is not downloaded yet — finish setup to fetch it".into());
     }
 
     emit(
@@ -157,7 +158,7 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
         StreamingVad::new(Vad::load(&vad_path, VadSettings::default()).map_err(|e| e.to_string())?);
     let mut injector = klar_platform::injector();
 
-    let binding = klar_platform::default_binding();
+    let binding = config.hotkey.clone();
     let (hotkey_tx, hotkey_rx) = channel();
     let mut hotkey = klar_platform::hotkey();
     hotkey
@@ -172,7 +173,7 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
     emit(
         app,
         UiEvent::Ready {
-            hotkey: format!("{binding:?}"),
+            hotkey: binding.clone(),
         },
     );
     emit(app, UiEvent::State { state: State::Idle });

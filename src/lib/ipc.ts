@@ -30,6 +30,37 @@ export interface PermissionReport {
   state: PermissionState;
 }
 
+export type PipelineState =
+  | "idle"
+  | "recording"
+  | "transcribing"
+  | "polishing"
+  | "injecting"
+  | "error";
+
+/** The engine's one channel, mirroring `UiEvent` in `src-tauri/src/engine.rs`.
+ * Every window that shows what the pipeline is doing reads this and nothing
+ * else — no window infers a state the Rust side did not send. */
+export type EngineEvent =
+  | { kind: "state"; state: PipelineState }
+  | { kind: "level"; peak: number }
+  | { kind: "text"; text: string; settled: boolean }
+  | { kind: "failed"; message: string }
+  | { kind: "loading"; what: string }
+  | { kind: "ready"; hotkey: Binding };
+
+export const ENGINE_EVENT = "klar://event";
+
+/** Download progress, mirroring `DownloadEvent` in
+ * `src-tauri/src/downloads.rs`. */
+export type ModelEvent =
+  | { phase: "downloading"; id: string; received: number; total: number }
+  | { phase: "verifying"; id: string }
+  | { phase: "done"; id: string }
+  | { phase: "failed"; id: string; message: string };
+
+export const MODEL_EVENT = "klar://model";
+
 /** True when running inside the Tauri shell rather than a plain browser tab. */
 export const inShell = (): boolean => isTauri();
 
@@ -39,6 +70,22 @@ export const defaultHotkey = (): Promise<Binding> => invoke<Binding>("default_ho
 
 export const permissionStates = (): Promise<PermissionReport[]> =>
   invoke<PermissionReport[]>("permission_states");
+
+export const openPermissionSettings = (permission: Permission): Promise<void> =>
+  invoke<void>("open_permission_settings", { permission });
+
+/** Start fetching a model. Progress arrives on {@link MODEL_EVENT}. */
+export const downloadModel = (id: string): Promise<void> => invoke<void>("model_download", { id });
+
+/** Open the microphone and report levels on {@link ENGINE_EVENT} until stopped. */
+export const micTestStart = (): Promise<void> => invoke<void>("mic_test_start");
+
+export const micTestStop = (): Promise<void> => invoke<void>("mic_test_stop");
+
+/** Start the engine again on whatever models are now on disk. */
+export const restartEngine = (): Promise<void> => invoke<void>("engine_restart");
+
+export const finishOnboarding = (): Promise<void> => invoke<void>("onboarding_finish");
 
 const MODIFIER_GLYPHS: Record<Modifier, { mac: string; other: string }> = {
   control: { mac: "⌃", other: "Ctrl" },

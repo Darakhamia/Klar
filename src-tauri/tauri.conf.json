@@ -19,7 +19,18 @@
         "minWidth": 820,
         "minHeight": 560,
         "resizable": true,
-        "visible": true,
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "onboarding",
+        "url": "onboarding.html",
+        "title": "Welcome to Klar",
+        "width": 680,
+        "height": 560,
+        "resizable": false,
+        "maximizable": false,
+        "visible": false,
         "center": true
       },
       {

@@ -64,6 +64,10 @@ pub struct Settings {
     /// Device name, or `None` for the system default.
     pub microphone: Option<String>,
     pub cleanup: Cleanup,
+    /// Whether first-run setup has been completed. False on a fresh install and
+    /// on an install that predates onboarding — running through it again costs
+    /// a few seconds when everything is already downloaded.
+    pub onboarded: bool,
 }
 
 impl Default for Settings {
@@ -78,6 +82,7 @@ impl Default for Settings {
             model: klar_core::model::DEFAULT_MODEL.to_owned(),
             microphone: None,
             cleanup: Cleanup::default(),
+            onboarded: false,
         }
     }
 }

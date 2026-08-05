@@ -9,6 +9,48 @@ Newest first.
 
 ## M6 — interface
 
+### Windows has no microphone permission worth asking about
+
+`permission_state(Microphone)` returns `Unknown` on Windows and means it. The
+Settings › Privacy › Microphone toggle gates *packaged* apps; a plain desktop
+process is not blocked by it, so there is no API that answers "may I record?"
+with anything useful.
+
+So onboarding's first step does not ask. It opens the device. If the stream
+starts, the answer is yes; if it fails, the error is the real one and the button
+next to it opens `ms-settings:privacy-microphone`. The level bars then answer the
+question the user actually has, which is not "is permission granted" but "can it
+hear me".
+
+macOS will need the real `AVCaptureDevice` check here. The screen is already
+shaped for it — the step list comes from what `permission_states` reports, not
+from a platform constant, so the accessibility step appears on macOS and is
+absent rather than skipped on Windows.
+
+### Onboarding's test field is a real text box
+
+The last step could have shown the transcript from the event stream and called
+it a demonstration. It types into a `<textarea>` instead, through the same
+clipboard paste every other app gets. That exercises `SendInput`, the clipboard
+save/restore, and the elevation check on the way to the user's first sentence —
+if injection is broken on their machine, they find out during setup rather than
+the first time they try to use the app.
+
+It also means the one place in Klar where `user-select: text` and a caret cursor
+are correct is this box. Everything else is an application window.
+
+### The engine starts before the models exist
+
+On a fresh install the engine thread starts, finds no model, and stops with a
+message. That is not an error state to recover from, it is the normal first-run
+sequence — so onboarding calls `engine_restart` once the download lands, rather
+than the engine polling for files that only appear if the user does something.
+
+The same command covers the case where the models were already there: the
+`Ready` event fires while the engine loads, which on an existing install happens
+before the onboarding window has finished subscribing. Restarting once when the
+step opens makes the event arrive after somebody is listening.
+
 ### The Tauri code can be type-checked on Linux, and should be
 
 `cargo check --target x86_64-pc-windows-msvc` stopped covering `src-tauri` at

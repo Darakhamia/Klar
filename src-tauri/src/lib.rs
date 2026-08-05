@@ -2,8 +2,11 @@
 //! all lives in `klar-core`, so it stays testable from `klar-cli`.
 
 mod commands;
+mod downloads;
 mod engine;
 mod logging;
+mod mic;
+mod onboarding;
 mod overlay;
 mod settings;
 mod tray;
@@ -37,6 +40,12 @@ pub fn run() {
             commands::models,
             commands::settings_get,
             commands::settings_set,
+            commands::engine_restart,
+            commands::open_permission_settings,
+            commands::model_download,
+            commands::mic_test_start,
+            commands::mic_test_stop,
+            commands::onboarding_finish,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -46,18 +55,37 @@ pub fn run() {
             follow_state(&handle);
 
             app.manage(Running(Mutex::new(None)));
-            restart_engine(&handle, &Settings::load());
+            app.manage(commands::Microphone::default());
+            app.manage(downloads::Active::default());
+
+            let settings = Settings::load();
+            restart_engine(&handle, &settings);
+
+            // Both windows start hidden so a fresh install never flashes the
+            // settings window behind onboarding.
+            if settings.onboarded {
+                tray::show_settings(&handle);
+            } else {
+                onboarding::show(&handle);
+            }
 
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing the settings window hides it. Klar is a background app;
-            // the tray is how it is quit.
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event
-                && window.label() == "main"
-            {
-                api.prevent_close();
-                let _ = window.hide();
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                match window.label() {
+                    // Closing the settings window hides it. Klar is a
+                    // background app; the tray is how it is quit.
+                    "main" => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    // Onboarding closed without finishing. Let it go, but put
+                    // the settings window up rather than leaving the user with
+                    // an app that is running and has nothing on screen.
+                    onboarding::LABEL => tray::show_settings(&window.app_handle().clone()),
+                    _ => {}
+                }
             }
         })
         .run(tauri::generate_context!())

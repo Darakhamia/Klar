@@ -1,0 +1,317 @@
+/* First run.
+ *
+ * 680 × 560, not resizable. Same Modernist rules as the rest of Klar — flush
+ * left, zero radius, 2px rules, one red — and the red here marks two things
+ * only: the steps behind you, and audio that is actually arriving. */
+
+#onboarding {
+  height: 100%;
+}
+
+.ob {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: var(--space-8) 52px 44px;
+}
+
+.ob h2 {
+  font-size: var(--text-display-m);
+  margin-bottom: var(--space-3);
+}
+
+.ob__body {
+  margin: 0 0 var(--space-8);
+  max-width: 46ch;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  text-wrap: pretty;
+}
+
+.ob__aside {
+  margin: 0;
+  max-width: 50ch;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+}
+
+.ob__error {
+  margin: var(--space-4) 0 0;
+  padding-left: var(--space-3);
+  border-left: var(--rule) solid var(--color-accent);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-accent);
+}
+
+/* — the step indicator — */
+
+.ob-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-8);
+}
+
+.ob-steps__dash {
+  width: 26px;
+  height: 3px;
+  background: var(--color-neutral-700);
+}
+
+.ob-steps__dash[data-on="true"] {
+  background: var(--color-accent);
+}
+
+.ob-steps .label {
+  margin-left: var(--space-2);
+}
+
+/* — actions — */
+
+.ob__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: auto;
+  padding-top: var(--space-8);
+}
+
+.ob__actions--end {
+  justify-content: flex-end;
+}
+
+.ob__btn {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  padding: 9px var(--space-4);
+  border: var(--rule) solid var(--color-text);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--duration-hover) linear;
+}
+
+.ob__btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.ob__btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.ob__btn--primary:hover:not(:disabled) {
+  background: var(--color-accent);
+}
+
+.ob__btn--ghost {
+  border-color: transparent;
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+  color: var(--color-accent);
+}
+
+.ob__btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* — step one: the level meter — */
+
+.ob-wave {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 68px;
+  margin-bottom: var(--space-8);
+}
+
+.ob-wave__bar {
+  width: 5px;
+  height: 100%;
+  transform-origin: bottom;
+  transform: scaleY(0.16);
+  background: var(--color-accent);
+  transition: transform 60ms linear;
+}
+
+/* Grey and breathing until the device is open: a red bar means audio is
+ * arriving, and before the stream exists none is. */
+.ob-wave__bar--idle {
+  background: var(--color-neutral-700);
+  transition: none;
+  animation: ob-level 1.2s ease-in-out infinite;
+}
+
+@keyframes ob-level {
+  0%,
+  100% {
+    transform: scaleY(0.16);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ob-wave__bar--idle {
+    animation: none;
+    transform: scaleY(0.4);
+  }
+}
+
+/* — step two: what accessibility is for — */
+
+.ob-inject {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  height: 68px;
+  margin-bottom: var(--space-8);
+}
+
+.ob-inject__app {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-3);
+  background: var(--color-surface);
+  border: var(--rule) solid var(--color-neutral-700);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.ob-inject__arrow {
+  align-self: center;
+  width: 56px;
+  height: 3px;
+  background: var(--color-accent);
+}
+
+.ob-inject__target {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-4);
+  background: var(--color-surface);
+  border: var(--rule) solid var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.ob-inject__caret {
+  color: var(--color-accent);
+}
+
+/* — step three: hotkey, model, first sentence — */
+
+.ob-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: var(--rule) solid var(--color-divider);
+}
+
+.ob-row__label {
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.ob-row__hint {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.ob-key {
+  padding: 8px var(--space-3);
+  background: var(--color-surface);
+  border: var(--rule) solid var(--color-text);
+}
+
+.label--on {
+  color: var(--color-accent);
+}
+
+.ob-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: var(--rule) solid var(--color-divider);
+}
+
+.ob-progress__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.ob-progress__track {
+  height: 6px;
+  background: var(--color-neutral-800);
+}
+
+.ob-progress__fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 200ms linear;
+}
+
+.ob-try {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+}
+
+.ob-try--waiting {
+  opacity: 0.45;
+}
+
+.ob-try__empty {
+  display: flex;
+  align-items: center;
+  height: 78px;
+  padding: 0 var(--space-4);
+  border: var(--rule) dashed var(--color-neutral-600);
+  color: var(--color-text-secondary);
+}
+
+.ob-try__field {
+  appearance: none;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  padding: var(--space-4);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: var(--rule) solid var(--color-text);
+  border-radius: var(--radius-md);
+  resize: none;
+  /* The one place in Klar where text is selectable and the cursor is a caret:
+     this is a real text box, and the dictation really is pasted into it. */
+  user-select: text;
+  cursor: text;
+}
+
+.ob-said {
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: var(--rule) solid var(--color-text);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.45;
+  user-select: text;
+}
