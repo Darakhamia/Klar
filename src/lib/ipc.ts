@@ -70,6 +70,22 @@ export const MODEL_EVENT = "klar://model";
 export const inShell = (): boolean => isTauri();
 
 /**
+ * Write a line into Klar's own log file, alongside everything Rust logs.
+ *
+ * The two halves of this app fail independently — Rust can report a command
+ * succeeding while the window that asked never hears the answer — and the
+ * window's side of that used to go only to a devtools console nobody had open.
+ * This is for the handful of moments where knowing what the window saw is the
+ * whole diagnosis, not for chatter.
+ */
+export function note(where: string, message: string): void {
+  if (!inShell()) return;
+  invoke<void>("ui_log", { window: where, message }).catch(() => {
+    // If this fails there is nowhere left to say so.
+  });
+}
+
+/**
  * Subscribe to an event, and return the cleanup an effect wants.
  *
  * `listen` can be refused — it is one of the core commands the capability files

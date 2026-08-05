@@ -46,6 +46,7 @@ pub fn run() {
             commands::mic_test_start,
             commands::mic_test_stop,
             commands::hotkey_capture,
+            commands::ui_log,
             commands::onboarding_finish,
         ])
         .setup(|app| {

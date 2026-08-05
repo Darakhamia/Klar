@@ -115,6 +115,19 @@ pub async fn hotkey_capture(app: AppHandle) -> Result<Binding, String> {
 /// enough to find a key, short enough that a forgotten capture ends itself.
 const CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
 
+/// Let a window write into the same log file the Rust side uses.
+///
+/// Not a general logging facility, and not for chatter. It exists because the
+/// two halves of this app fail independently: Rust can report a command
+/// succeeding while the window that asked never hears the answer, and until now
+/// the window's side of that went to a devtools console nobody had open. One
+/// log with both halves in it is the difference between a diagnosis and a
+/// guess.
+#[tauri::command]
+pub fn ui_log(window: String, message: String) {
+    tracing::info!(window = %window, "ui: {message}");
+}
+
 /// Start the engine again on whatever is now on disk.
 ///
 /// Onboarding calls this once the models have finished downloading: the engine

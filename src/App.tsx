@@ -11,6 +11,7 @@ import {
   ENGINE_EVENT,
   appVersion,
   inShell,
+  note,
   subscribe,
   type AppVersion,
   type Binding,
@@ -71,15 +72,27 @@ export function App() {
   // second audio stream open just to draw a bar.
   useEffect(() => {
     if (!inShell()) return;
+    note("settings", "mounted; subscribing to the engine");
+    let heard = false;
+
     return subscribe<EngineEvent>(
       ENGINE_EVENT,
       (payload) => {
+        // Once, on the first event that ever arrives. The open question is
+        // whether any do — this window has been acting as though none reach it.
+        if (!heard) {
+          heard = true;
+          note("settings", `first engine event received: ${payload.kind}`);
+        }
         if (payload.kind === "level") setLevel(payload.peak);
         if (payload.kind === "state") setLevel(0);
       },
       // A refused subscription used to reach nothing but the console, which is
       // how a window sat deaf for a milestone. It is an error like any other.
-      setError,
+      (message) => {
+        note("settings", `subscribe refused: ${message}`);
+        setError(message);
+      },
     );
   }, []);
 

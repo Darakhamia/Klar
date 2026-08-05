@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Figure, Row, Segmented, Select } from "../components/Row";
-import { captureHotkey, formatBinding, type Binding } from "../lib/ipc";
+import { captureHotkey, formatBinding, note, type Binding } from "../lib/ipc";
 import type { Appearance, FinishAction, OverlayPosition, Settings } from "../lib/settings";
 
 export function General({
@@ -116,12 +116,16 @@ function Hotkey({
         onClick={() => {
           setRefused(null);
           setCapturing(true);
+          note("settings", "rebind: asked, button should now read Press a key…");
           captureHotkey()
             .then((hotkey) => {
+              note("settings", `rebind: resolved with ${JSON.stringify(hotkey)}`);
               onRebound(hotkey);
             })
             .catch((cause: unknown) => {
-              setRefused(cause instanceof Error ? cause.message : String(cause));
+              const message = cause instanceof Error ? cause.message : String(cause);
+              note("settings", `rebind: rejected with ${message}`);
+              setRefused(message);
             })
             .finally(() => {
               setCapturing(false);
