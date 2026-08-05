@@ -107,10 +107,27 @@ The build needs `$VULKAN_SDK\Lib\vulkan-1.lib` to link and `$VULKAN_SDK\Bin\glsl
 to compile the shaders, both of which it finds from that one variable. None of
 it is needed to *run* Klar — see [Which GPU build](#which-gpu-build).
 
+#### Reading a whisper.cpp build failure
+
+whisper.cpp emits a few thousand lines of CMake policy warnings on every
+configure, and a failure is one line somewhere inside them. The tail of the
+output is never the cause — it is `cmake ... exited with code 1` and a Rust
+panic from the `cmake` crate, which says nothing. Keep the whole log and pull
+the cause out of it:
+
+```powershell
+npm run tauri build -- --features vulkan 2>&1 | Out-File C:\kv\build.log
+Select-String -Path C:\kv\build.log `
+  -Pattern "error [A-Z]+\d+|exceeds the OS max path|Cannot open|not found|fatal error" |
+  Select-Object -First 20
+```
+
+Works for `cargo build` the same way. Every whisper.cpp failure so far has been
+one line that this finds and scrolling does not.
+
 #### The Vulkan build runs into MAX_PATH
 
-Then it fails again, under a few thousand lines of CMake policy warnings. The
-one line that matters is this:
+The first one, under those few thousand warnings:
 
 ```
 Path: cmTC_f87cd.dir\Debug\cmTC_f87cd.tlog\ParallelCustomBuild.write.1.tlog
