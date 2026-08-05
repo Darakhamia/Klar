@@ -18,7 +18,7 @@
 use super::keys;
 use crate::{BadBinding, Binding, Hotkey, HotkeyEvent, PlatformError};
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicUsize, Ordering};
 use std::sync::mpsc::{Sender, channel};
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
@@ -138,16 +138,17 @@ impl Drop for WindowsHotkey {
 /// Set while a chord is being captured. Read by every hook this process has
 /// installed.
 ///
-/// Capture does not depend on being the hook that receives the key. A hook of
-/// its own is installed — which is all there is in `klar-cli` — but the
-/// push-to-talk hook captures too when this is set, and inside the app that is
-/// the one demonstrably being handed keystrokes. Whichever the system reaches
-/// first records the chord; the other finds it already taken.
+/// Capture does not install a hook of its own when one is already running. It
+/// raises this flag instead, and the push-to-talk hook — the one already being
+/// handed keystrokes — records the chord and swallows the key.
 ///
-/// This is deliberately belt and braces. A capture-only hook installed by the
-/// app never received a single callback, while the identical hook in the CLI
-/// received every keystroke, and I never found out why. Riding the hook that
-/// works makes the answer unnecessary rather than merely unknown.
+/// The reason is measured rather than reasoned: with a push-to-talk hook
+/// running normally, installing a second low-level keyboard hook stopped the
+/// first one being called. Its event counter froze at the moment a capture
+/// armed, stayed frozen for the ten seconds the user spent pressing keys, and
+/// had been ticking up seconds earlier. Both hooks silent, in a process where
+/// dictation had just worked. I have no explanation for that, only the
+/// measurement — so capture no longer does the thing that triggers it.
 static CAPTURING: AtomicBool = AtomicBool::new(false);
 
 /// The chord, once a hook has seen one. Plain atomics because they are written
@@ -162,6 +163,16 @@ static CAPTURED_MODIFIERS: AtomicU8 = AtomicU8::new(0);
 /// all — a dead hook rather than a fussy filter, which the outcome alone cannot
 /// distinguish.
 static SEEN: AtomicU32 = AtomicU32::new(0);
+
+/// How many push-to-talk hooks this process has installed right now.
+///
+/// Capture uses it to decide whether it needs a hook of its own. On this
+/// machine, installing a second low-level keyboard hook stops the first one
+/// being called: the push-to-talk hook's counter froze at the exact moment a
+/// capture armed and did not move again for ten seconds, having been ticking up
+/// normally a few seconds earlier. So capture installs one only when there is
+/// nothing already listening.
+static HOOKS: AtomicUsize = AtomicUsize::new(0);
 
 /// Every key event the push-to-talk hook has been handed since it was
 /// installed, capture or no capture.
@@ -237,23 +248,22 @@ fn record(wparam: WPARAM, lparam: LPARAM) -> bool {
 pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     let _capturing = CaptureGuard::begin();
 
-    // A hook of our own, so capture works when nothing else in this process is
-    // hooked — `klar-cli`, and the app before its engine has loaded. When the
-    // push-to-talk hook is running it captures too, and inside the app that is
-    // the one that actually gets the keystrokes.
-    let own = TemporaryHook::install();
-    match &own {
-        Ok(_) => tracing::info!(
-            ?timeout,
-            push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
-            "capture armed; waiting for a chord"
-        ),
-        // Not fatal on its own: the push-to-talk hook may still deliver. Said
-        // out loud, because if nothing else is hooked this capture is doomed.
-        Err(error) => {
-            tracing::warn!(%error, "no capture hook of our own; relying on the push-to-talk hook")
-        }
-    }
+    // A hook of our own only when nothing else is listening — `klar-cli`, or
+    // the app before its engine has loaded. Adding a second one where a
+    // push-to-talk hook is already running is what silences both.
+    let riding = HOOKS.load(Ordering::SeqCst) > 0;
+    let _own = if riding {
+        None
+    } else {
+        Some(TemporaryHook::install()?)
+    };
+
+    tracing::info!(
+        ?timeout,
+        riding,
+        push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
+        "capture armed; waiting for a chord"
+    );
 
     let deadline = Instant::now() + timeout;
     while !CAPTURED.load(Ordering::SeqCst) {
@@ -393,15 +403,19 @@ fn run_hook(
         }
     };
 
+    HOOKS.fetch_add(1, Ordering::SeqCst);
+
     // SAFETY: no arguments, returns the calling thread's id.
     let thread_id = unsafe { windows::Win32::System::Threading::GetCurrentThreadId() };
     if ready.send(Ok(thread_id)).is_err() {
+        HOOKS.fetch_sub(1, Ordering::SeqCst);
         // SAFETY: unhooking a handle we installed and have not yet released.
         let _ = unsafe { UnhookWindowsHookEx(hook) };
         return;
     }
 
     pump_until_quit();
+    HOOKS.fetch_sub(1, Ordering::SeqCst);
 
     // SAFETY: same handle, released exactly once.
     let _ = unsafe { UnhookWindowsHookEx(hook) };

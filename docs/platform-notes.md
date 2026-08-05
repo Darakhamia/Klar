@@ -110,34 +110,37 @@ is: a key that types a character needs a modifier, because bound bare the hook
 would swallow every one the user typed. A key that types nothing — a function
 key, Insert, an arrow — may be bound alone.
 
-### A capture hook that fires in the CLI and never fires in the app
+### Installing a second low-level keyboard hook silenced the first
 
-Unexplained, and now routed around rather than solved.
+The measurement, from one run:
 
-The facts: a `WH_KEYBOARD_LL` hook installed by `capture_binding` receives every
-keystroke when `klar-cli` installs it — including with a push-to-talk hook
-already running in the same process, which is the case that looked most
-suspicious and turned out fine. The same code in the app receives nothing:
-`SetWindowsHookExW` succeeds, the thread pumps, and the callback is not called
-once. `seen=0`, twice in a row, while the user was pressing keys.
+```
+17:58:44  dictation delivered            ← push-to-talk hook working
+17:58:47  capture armed   push_to_talk_seen=59
+17:58:57  capture timed out  seen=0  push_to_talk_seen=59
+```
 
-The push-to-talk hook in that same process is being handed those keystrokes
-perfectly well — dictation works. So capture stopped insisting on being the hook
-that receives the key. `CAPTURING` is a process-wide flag; every hook Klar has
-installed records into the same three atomics while it is set, and
-`capture_binding` waits on those rather than on a channel from one particular
-hook. Its own temporary hook is still installed, because in `klar-cli` there is
-nothing else to ride.
+Fifty-nine key events before the capture, none during it. The push-to-talk hook
+had just carried a whole dictation; three seconds later, with a second
+`WH_KEYBOARD_LL` hook installed, it was handed nothing for ten seconds while the
+user pressed keys. Both hooks silent, in a process where the keyboard had
+demonstrably been reaching one of them.
 
-This is a workaround for something I do not understand, which is worth saying
-plainly. What it costs is one atomic load per keystroke in a callback that
-already reads `GetAsyncKeyState`. What it buys is that the mechanism no longer
-depends on the thing that was failing.
+I have no explanation for that. `SetWindowsHookExW` succeeds, the capture
+thread pumps, and neither callback is called. It does not reproduce in
+`klar-cli`, where the same two hooks coexist and capture works.
 
-The diagnostic that got us here stays in: every hook counts the events it is
-handed while capturing, before any filtering, and a timeout logs the count. Zero
-is a dead hook, non-zero with no chord is a filter that is too strict, and it
-took four rounds of guessing to earn that distinction.
+So capture does not install a second hook when one is already there. `HOOKS`
+counts the push-to-talk hooks this process has, and `capture_binding` installs
+its own only when that count is zero — `klar-cli`, or the app before its engine
+has loaded. Otherwise it raises `CAPTURING` and the push-to-talk hook records
+the chord into three atomics and swallows the key.
+
+Written down because it is a workaround, not a fix. If a second hook is ever
+needed for something else, this is the trap it will fall into, and the counters
+are still in place to catch it: every hook counts what it is handed, `SEEN`
+during a capture and `HOOK_SEEN` always, and both are logged when a capture arms
+and when one times out.
 
 ### `listen` is ACL-gated per window, and a refusal is silent
 
