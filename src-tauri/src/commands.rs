@@ -3,6 +3,7 @@
 //! The frontend talks to Rust only through these and through events. No logic
 //! is duplicated in TypeScript.
 
+use crate::settings::Settings;
 use klar_platform::{Binding, Permission, PermissionState};
 use serde::Serialize;
 
@@ -33,6 +34,23 @@ pub fn default_hotkey() -> Binding {
 pub struct PermissionReport {
     permission: Permission,
     state: PermissionState,
+}
+
+/// Everything the user has chosen.
+#[tauri::command]
+pub fn settings_get() -> Settings {
+    Settings::load()
+}
+
+/// Replace the settings and restart the engine so they take effect.
+///
+/// Restarting rather than mutating: the engine holds a loaded model and a
+/// registered hook, and half of these settings change which model that is.
+#[tauri::command]
+pub fn settings_set(app: tauri::AppHandle, settings: Settings) -> Result<(), String> {
+    settings.save()?;
+    crate::restart_engine(&app, &settings);
+    Ok(())
 }
 
 /// The microphones the user could pick, default first.

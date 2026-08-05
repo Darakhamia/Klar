@@ -14,9 +14,10 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 ## Status
 
 **M6 in progress — the app.** Tray icon, a dictation engine running the M1-M3
-pipeline in the background, and the overlay from the design (direction A,
-"Collapse") rendering the pipeline's five states. The settings window and
-onboarding are next.
+pipeline in the background, the overlay from the design (direction A,
+"Collapse"), and the settings window: General and Voice are live and take
+effect immediately; Dictionary, History and Stats are waiting on the database
+in M5 and say so rather than showing invented rows. Onboarding is next.
 
 **M3 passed on Windows.** Transcription runs during speech and commits at
 pauses, so key release leaves only the tail: median 260 ms from key-up to

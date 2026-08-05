@@ -55,11 +55,19 @@ impl Default for EngineConfig {
     fn default() -> Self {
         Self {
             model: model::DEFAULT_MODEL.to_owned(),
-            // Left unset until the settings window can ask. Pinning it saves
-            // whisper's detection pass — about 114 ms — so this is the first
-            // thing that window should offer.
             language: None,
             device: None,
+            stream: StreamConfig::default(),
+        }
+    }
+}
+
+impl From<&crate::settings::Settings> for EngineConfig {
+    fn from(settings: &crate::settings::Settings) -> Self {
+        Self {
+            model: settings.model.clone(),
+            language: settings.language.clone(),
+            device: settings.microphone.clone(),
             stream: StreamConfig::default(),
         }
     }

@@ -1,44 +1,54 @@
 /**
- * M0 shell.
+ * The settings window.
  *
- * The window exists and can read the Rust side; the five real sections
- * (General, Voice, Dictionary, History, Stats) arrive in M6. Everything shown
- * here comes from a named command — nothing is hard-coded on this side.
+ * 900 × 620 and completely still. Settings are a place you visit twice a year,
+ * so nothing here moves or celebrates: rows sit on a single left edge, 2px
+ * rules separate them, and red marks only what is currently on.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { appVersion, inShell, type AppVersion } from "./lib/ipc";
 import {
-  appVersion,
-  defaultHotkey,
-  formatBinding,
-  inShell,
-  permissionStates,
-  type AppVersion,
-  type Binding,
-  type PermissionReport,
-} from "./lib/ipc";
+  getSettings,
+  listDevices,
+  listModels,
+  setSettings,
+  type Device,
+  type ModelStatus,
+  type Settings,
+} from "./lib/settings";
+import { General } from "./sections/General";
+import { Voice } from "./sections/Voice";
+import { DICTIONARY, HISTORY, Pending, STATS } from "./sections/Pending";
 import "./App.css";
 
-interface Backend {
-  version: AppVersion;
-  hotkey: Binding;
-  permissions: PermissionReport[];
-}
+const SECTIONS = ["General", "Voice", "Dictionary", "History", "Stats"] as const;
+type Section = (typeof SECTIONS)[number];
 
 export function App() {
-  const [backend, setBackend] = useState<Backend | null>(null);
+  const [section, setSection] = useState<Section>("General");
+  const [settings, setLocal] = useState<Settings | null>(null);
+  const [models, setModels] = useState<ModelStatus[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [version, setVersion] = useState<AppVersion | null>(null);
+  const [level, setLevel] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const load = inShell()
-      ? Promise.all([appVersion(), defaultHotkey(), permissionStates()])
+      ? Promise.all([getSettings(), listModels(), listDevices(), appVersion()])
       : Promise.reject(
           new Error("Not running inside the Klar shell — start it with `npm run tauri dev`."),
         );
     load
-      .then(([version, hotkey, permissions]) => {
-        if (!cancelled) setBackend({ version, hotkey, permissions });
+      .then(([loaded, catalogue, inputs, app]) => {
+        if (cancelled) return;
+        setLocal(loaded);
+        setModels(catalogue);
+        setDevices(inputs);
+        setVersion(app);
       })
       .catch((cause: unknown) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
@@ -48,44 +58,82 @@ export function App() {
     };
   }, []);
 
+  // The meter in Voice is fed by the engine's own level events, so there is no
+  // second audio stream open just to draw a bar.
+  useEffect(() => {
+    if (!inShell()) return;
+    const pending = listen<{ kind: string; peak?: number }>("klar://event", ({ payload }) => {
+      if (payload.kind === "level" && typeof payload.peak === "number") {
+        setLevel(payload.peak);
+      }
+      if (payload.kind === "state") {
+        setLevel(0);
+      }
+    });
+    return () => {
+      void pending.then((unlisten) => {
+        unlisten();
+      });
+    };
+  }, []);
+
+  // Every change is saved and applied immediately. There is no Save button:
+  // nothing here is a form, and a setting that has not taken effect is a lie.
+  const update = useCallback((next: Settings) => {
+    setLocal(next);
+    setSettings(next).catch((cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    });
+  }, []);
+
   return (
-    <main className="shell">
-      <header className="shell__head">
-        <div className="label">Klar — desktop dictation</div>
-        <h1>Messy speech in, finished text out.</h1>
-      </header>
+    <main className="window">
+      <nav className="nav">
+        <div className="nav__brand">Klar</div>
+        {SECTIONS.map((name) => (
+          <button
+            key={name}
+            type="button"
+            className="nav__item"
+            aria-current={name === section ? "page" : undefined}
+            onClick={() => {
+              setSection(name);
+            }}
+          >
+            {name}
+          </button>
+        ))}
+        <div className="nav__foot figure">
+          {version ? `${version.version} · ${version.os} ${version.arch}` : ""}
+        </div>
+      </nav>
 
-      {error && <p className="shell__note shell__note--error">{error}</p>}
+      <section className="panel">
+        <header className="panel__head">
+          <h1>{section}</h1>
+        </header>
 
-      {backend && (
-        <dl className="facts">
-          <Fact term="Version" value={backend.version.version} />
-          <Fact term="Platform" value={`${backend.version.os} ${backend.version.arch}`} />
-          <Fact
-            term="Push to talk"
-            value={formatBinding(backend.hotkey, backend.version.os)}
-          />
-          {backend.permissions.map((report) => (
-            <Fact key={report.permission} term={report.permission} value={report.state} />
-          ))}
-        </dl>
-      )}
+        {error && <p className="panel__error">{error}</p>}
 
-      {!backend && !error && <p className="shell__note">Reading the backend…</p>}
-
-      <footer className="shell__foot">
-        <span className="label">M0 — scaffold</span>
-        <span className="label">Speech never leaves this machine</span>
-      </footer>
+        <div className="panel__body">
+          {settings && section === "General" && (
+            <General settings={settings} os={version?.os ?? "windows"} onChange={update} />
+          )}
+          {settings && section === "Voice" && (
+            <Voice
+              settings={settings}
+              models={models}
+              devices={devices}
+              level={level}
+              onChange={update}
+            />
+          )}
+          {section === "Dictionary" && <Pending {...DICTIONARY} />}
+          {section === "History" && <Pending {...HISTORY} />}
+          {section === "Stats" && <Pending {...STATS} />}
+          {!settings && !error && <p className="panel__error">Reading settings…</p>}
+        </div>
+      </section>
     </main>
-  );
-}
-
-function Fact({ term, value }: { term: string; value: string }) {
-  return (
-    <div className="facts__row">
-      <dt className="label">{term}</dt>
-      <dd className="figure">{value}</dd>
-    </div>
   );
 }

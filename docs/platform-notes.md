@@ -19,6 +19,30 @@ Installing `libwebkit2gtk-4.1-dev` and `libgtk-3-dev` gets `cargo check -p klar`
 compiling on Linux. Linux is still not a target and nothing is run there — but
 it catches every misuse of the Tauri API, which is what the check is for.
 
+### Settings are a file, not a database
+
+A dozen fields read once at startup, in JSON in the config directory, written
+through a temporary file so an interrupted save cannot truncate it. A settings
+file that will not parse is replaced with the defaults rather than being fatal —
+the app has to start.
+
+The database M5 builds is for dictations, dictionary terms and statistics:
+things there are thousands of. Settings are not that.
+
+### Changing a setting restarts the engine
+
+Most of them decide which model is loaded or which key is hooked, so the engine
+is replaced rather than reconfigured. It takes about a second, which is why
+there is no Save button — each change applies as it is made, and a setting that
+has not taken effect is a lie.
+
+### Three sections with nothing to show
+
+Dictionary, History and Stats all read from the database that does not exist
+yet. They say what they will hold and what they are waiting for. Filling them
+with invented rows would look finished and be false, and the difference would
+only be discovered by someone trying to use them.
+
 ### The overlay is a second page, not a second component
 
 It is shown and hidden constantly and must not carry the settings window's code

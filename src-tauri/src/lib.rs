@@ -5,11 +5,17 @@ mod commands;
 mod engine;
 mod logging;
 mod overlay;
+mod settings;
 mod tray;
 
 use engine::{Engine, EngineConfig, UiEvent};
 use klar_core::State;
+use parking_lot::Mutex;
+use settings::Settings;
 use tauri::{AppHandle, Listener, Manager};
+
+/// The running engine, replaced whenever settings change.
+struct Running(Mutex<Option<Engine>>);
 
 /// Entry point shared by the desktop binary and (eventually) any other host.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,6 +35,8 @@ pub fn run() {
             commands::permission_states,
             commands::audio_devices,
             commands::models,
+            commands::settings_get,
+            commands::settings_set,
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -37,8 +45,8 @@ pub fn run() {
             overlay::prepare(&handle)?;
             follow_state(&handle);
 
-            let engine = Engine::start(handle.clone(), EngineConfig::default());
-            app.manage(engine);
+            app.manage(Running(Mutex::new(None)));
+            restart_engine(&handle, &Settings::load());
 
             Ok(())
         })
@@ -57,6 +65,23 @@ pub fn run() {
             tracing::error!(%error, "tauri failed to start");
             std::process::exit(1);
         });
+}
+
+/// Stop whatever is running and start again with these settings.
+///
+/// Replacing rather than reconfiguring: the engine holds a loaded model and a
+/// registered keyboard hook, and most of these settings decide what those are.
+pub fn restart_engine(app: &AppHandle, settings: &Settings) {
+    let Some(running) = app.try_state::<Running>() else {
+        tracing::error!("the engine slot is missing; settings will not take effect");
+        return;
+    };
+
+    let mut slot = running.0.lock();
+    if let Some(previous) = slot.take() {
+        previous.stop();
+    }
+    *slot = Some(Engine::start(app.clone(), EngineConfig::from(settings)));
 }
 
 /// Show and hide the overlay in step with the pipeline.
