@@ -7,6 +7,37 @@ Newest first.
 
 ---
 
+## M6 — interface
+
+### The Tauri code can be type-checked on Linux, and should be
+
+`cargo check --target x86_64-pc-windows-msvc` stopped covering `src-tauri` at
+M1, because it depends on `klar-core` and so on whisper-rs-sys, which needs a
+real MSVC toolchain. That left the whole Tauri layer unverifiable here.
+
+Installing `libwebkit2gtk-4.1-dev` and `libgtk-3-dev` gets `cargo check -p klar`
+compiling on Linux. Linux is still not a target and nothing is run there — but
+it catches every misuse of the Tauri API, which is what the check is for.
+
+### The overlay is a second page, not a second component
+
+It is shown and hidden constantly and must not carry the settings window's code
+around with it, so `overlay.html` is its own Vite entry point with its own
+bundle. 3 kB against the main window's 193.
+
+### Click-through, and what that costs the error state
+
+The overlay window sets `set_ignore_cursor_events(true)` once and leaves it on.
+A window that swallows clicks over someone's editor is worse than no overlay at
+all.
+
+The design says the error state waits until dismissed. It cannot be dismissed by
+clicking a window that ignores the cursor, so that needs either a timeout or
+turning click-through off for that one state. Left open until the error state
+has a real user path.
+
+---
+
 ## M3 — streaming
 
 ### Measured

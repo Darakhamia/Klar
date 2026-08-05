@@ -11,7 +11,7 @@ use std::fmt;
 /// Where the pipeline currently is. The overlay maps these one-to-one onto its
 /// five visual states — `Transcribing` is "thinking", `Injecting` folds into
 /// "done".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum State {
     Idle,

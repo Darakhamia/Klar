@@ -1,0 +1,125 @@
+/* The overlay shell.
+ *
+ * Dark by default: it floats over white documents, dark editors and video calls
+ * alike, and a near-opaque ink ground holds an edge against all three. Zero
+ * radius and a 2px rule, like everything else in the system. */
+
+@import "../styles/tokens.css";
+
+.overlay-body {
+  margin: 0;
+  /* The window itself is transparent; only the pill is drawn. */
+  background: transparent;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  /* Nothing here is selectable or clickable — the window ignores the cursor. */
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  height: 100vh;
+}
+
+.pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 260px;
+  height: 64px;
+  padding: 0 var(--space-4);
+
+  background: var(--color-neutral-900);
+  border: var(--rule) solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+
+  /* Resolve, never bounce. */
+  transition: width var(--duration-collapse) var(--ease-resolve);
+}
+
+/* Width earns itself: only once there are real words, and never past 360. */
+.pill[data-wide="true"] {
+  width: 360px;
+}
+
+.pill__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.pill__status {
+  font-size: var(--text-label);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--color-neutral-400);
+  transition: color var(--duration-state) linear;
+}
+
+/* Red means live: while audio is being captured, and on an error. Nowhere else. */
+.pill[data-state="recording"] .pill__status,
+.pill[data-state="error"] .pill__status {
+  color: var(--color-accent-500);
+}
+
+.pill__meta {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  color: var(--color-neutral-400);
+
+  /* Two lines of recognised text at most; the overlay is not a document. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pill[data-state="injecting"] .pill__meta,
+.pill[data-state="polishing"] .pill__meta {
+  font-size: 12px;
+  letter-spacing: 0;
+  color: var(--color-neutral-100);
+}
+
+.wave {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  height: 30px;
+  width: 84px;
+}
+
+.wave__bar {
+  width: 3px;
+  flex-shrink: 0;
+  background: var(--color-accent-500);
+  /* Height follows the audio with no easing — a level meter that lags is
+   * lying about the level. Everything else resolves. */
+  transition:
+    height 130ms linear,
+    width var(--duration-collapse) var(--ease-resolve),
+    background-color var(--duration-state) linear,
+    opacity var(--duration-state) linear;
+}
+
+/* Once the audio has become text the bars are no longer live: they flatten,
+ * widen into blocks, and go grey. */
+.wave[data-collapsed="true"] .wave__bar {
+  width: 5px;
+  background: var(--color-neutral-600);
+}
+
+.pill[data-state="error"] .wave__bar {
+  background: var(--color-accent-500);
+}

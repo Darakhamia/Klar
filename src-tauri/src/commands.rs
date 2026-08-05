@@ -35,6 +35,34 @@ pub struct PermissionReport {
     state: PermissionState,
 }
 
+/// The microphones the user could pick, default first.
+#[tauri::command]
+pub fn audio_devices() -> Result<Vec<klar_core::audio::Device>, String> {
+    klar_core::audio::capture_devices().map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+pub struct ModelStatus {
+    #[serde(flatten)]
+    spec: &'static klar_core::model::ModelSpec,
+    installed: bool,
+    size: String,
+}
+
+/// The model catalogue and what is already on disk.
+#[tauri::command]
+pub fn models() -> Result<Vec<ModelStatus>, String> {
+    let dir = klar_core::model::models_dir().ok_or("no app data directory")?;
+    Ok(klar_core::model::CATALOGUE
+        .iter()
+        .map(|spec| ModelStatus {
+            spec,
+            installed: klar_core::model::is_present(&dir, spec),
+            size: spec.human_size(),
+        })
+        .collect())
+}
+
 /// What the OS currently says about each permission onboarding walks through.
 #[tauri::command]
 pub fn permission_states() -> Vec<PermissionReport> {

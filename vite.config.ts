@@ -16,6 +16,16 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
+    rollupOptions: {
+      // Two windows, two pages. The overlay is deliberately separate: it is
+      // shown and hidden constantly and must not carry the settings window's
+      // code around with it.
+      // Relative to the project root, so no node types are needed here.
+      input: {
+        main: "index.html",
+        overlay: "overlay.html",
+      },
+    },
     // Klar targets a known WebView2 / WKWebView, not the open web.
     target: "es2022",
     sourcemap: true,

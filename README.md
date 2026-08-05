@@ -13,6 +13,11 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
+**M6 in progress — the app.** Tray icon, a dictation engine running the M1-M3
+pipeline in the background, and the overlay from the design (direction A,
+"Collapse") rendering the pipeline's five states. The settings window and
+onboarding are next.
+
 **M3 passed on Windows.** Transcription runs during speech and commits at
 pauses, so key release leaves only the tail: median 260 ms from key-up to
 inserted text against a 500 ms criterion. A 22-second dictation streams 21.8 s
@@ -71,7 +76,7 @@ macOS needs Xcode command line tools and CMake (`brew install cmake`).
 
 ```sh
 npm install
-npm run tauri dev                  # the app
+npm run tauri dev -- --features cuda   # the app, on the GPU
 cargo run -p klar-cli -- doctor    # OS, audio devices, ASR backend, models
 ```
 

@@ -17,6 +17,15 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "klar"
 path = "src/main.rs"
 
+[features]
+default = []
+# Forwarded to klar-core so `npm run tauri dev -- --features cuda` builds the
+# GPU path. No GPU feature is on by default; see klar-core's manifest.
+cuda = ["klar-core/cuda"]
+vulkan = ["klar-core/vulkan"]
+metal = ["klar-core/metal"]
+coreml = ["klar-core/coreml"]
+
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
 
