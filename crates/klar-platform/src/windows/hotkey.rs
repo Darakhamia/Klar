@@ -164,6 +164,10 @@ static CAPTURED_MODIFIERS: AtomicU8 = AtomicU8::new(0);
 /// distinguish.
 static SEEN: AtomicU32 = AtomicU32::new(0);
 
+/// The last virtual key any hook was handed, so a growing [`HOOK_SEEN`] can be
+/// checked against what was actually pressed rather than taken on trust.
+static LAST_KEY: AtomicU32 = AtomicU32::new(0);
+
 /// How many push-to-talk hooks this process has installed right now.
 ///
 /// Capture uses it to decide whether it needs a hook of its own. On this
@@ -261,7 +265,9 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     tracing::info!(
         ?timeout,
         riding,
+        hooks = HOOKS.load(Ordering::SeqCst),
         push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
+        last_key = format!("{:#04x}", LAST_KEY.load(Ordering::Relaxed)),
         "capture armed; waiting for a chord"
     );
 
@@ -271,6 +277,7 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
             tracing::warn!(
                 seen = SEEN.load(Ordering::SeqCst),
                 push_to_talk_seen = HOOK_SEEN.load(Ordering::SeqCst),
+                last_key = format!("{:#04x}", LAST_KEY.load(Ordering::Relaxed)),
                 "capture timed out; key events the hooks were handed"
             );
             return Err(BadBinding::TimedOut.into());
@@ -452,6 +459,12 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
     // Counted before anything else, so "is this hook alive at all" has an
     // answer that does not depend on what the key was.
     HOOK_SEEN.fetch_add(1, Ordering::Relaxed);
+    // SAFETY: for WH_KEYBOARD_LL with code >= 0, lParam is a pointer to a
+    // KBDLLHOOKSTRUCT owned by the system for the duration of this call.
+    LAST_KEY.store(
+        unsafe { (*(lparam.0 as *const KBDLLHOOKSTRUCT)).vkCode },
+        Ordering::Relaxed,
+    );
 
     // A capture is running. This hook takes it rather than standing aside: in
     // the app it is the one being handed keystrokes, and push-to-talk has
