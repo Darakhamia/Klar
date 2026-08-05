@@ -117,13 +117,15 @@ the cause out of it:
 
 ```powershell
 npm run tauri build -- --features vulkan 2>&1 | Out-File C:\kv\build.log
-Select-String -Path C:\kv\build.log `
-  -Pattern "error [A-Z]+\d+|exceeds the OS max path|Cannot open|not found|fatal error" |
+Select-String -Path C:\kv\build.log -Context 0,4 `
+  -Pattern "CMake Error|error [A-Z]+\d+|error C\d|exceeds the OS max path|fatal error" |
   Select-Object -First 20
 ```
 
-Works for `cargo build` the same way. Every whisper.cpp failure so far has been
-one line that this finds and scrolling does not.
+Works for `cargo build` the same way. Match `CMake Error` as well as MSBuild's
+`error MSBnnnn`: which one you get depends on the generator, and a pattern for
+only one of them comes back empty on a build that plainly failed. `-Context 0,4`
+matters too — CMake puts the diagnosis on the lines *after* the word "Error".
 
 #### The Vulkan build needs Ninja on Windows
 
