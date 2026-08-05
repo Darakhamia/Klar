@@ -32,15 +32,19 @@ the system's input path, where every added test is paid for on every keystroke
 on the machine.
 
 So capture is its own `WH_KEYBOARD_LL` hook on its own thread, with its own
-thread-local, and the engine is stopped for the duration. That last part is not
-optional: while both hooks are installed they both match the same key, and if
-the old one wins, pressing the hotkey to rebind it starts a dictation instead.
+thread-local.
 
-Which is why `Engine::stop` now joins rather than setting a flag and walking
-away. It costs one poll interval — 100 ms — and it is safe against the main
-thread: with Tauri's `tracing` feature off, `emit` from a background thread
-posts to the event proxy and returns, so the engine thread never waits on the
-thread that is joining it.
+The two hooks coexist, and the engine keeps running while a chord is captured.
+Windows calls the most recently installed hook first, and the capture hook
+swallows every non-modifier key-down it is offered, so the push-to-talk hook is
+never handed the key and cannot start a dictation out from under the rebind.
+`klar-cli rebind --with-hook` exists to check that this is still true.
+
+I first built it the other way — stop the engine, capture, restart — and it did
+not work in the app while the identical platform call worked from the CLI. The
+join was the only link in that path that could block, and it was buying nothing
+the hook chain was not already giving. Removing it is a simplification, not a
+diagnosis: I never proved the join was where it hung.
 
 Modifiers are read with `GetAsyncKeyState` at the instant of the key-down and
 sent as a bitmask, not a `Vec`: the callback must not allocate. Modifier

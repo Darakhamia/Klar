@@ -72,16 +72,19 @@ pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
 
 /// Wait for the user to press a chord, and bind it.
 ///
-/// The engine is stopped first: its hook owns the current binding, and pressing
-/// it to rebind it would start a dictation instead. Blocks for as long as the
-/// user takes, so it runs off the main thread and answers on `klar://hotkey`.
+/// The engine keeps running throughout. Windows calls the most recently
+/// installed hook first, and the capture hook swallows every non-modifier
+/// key-down it sees, so the engine's push-to-talk hook is never handed the key
+/// and cannot start a dictation out from under the rebind. Stopping the engine
+/// first would only add a thread join to the one path that must not block.
+///
+/// Blocks for as long as the user takes to press something, so it runs off the
+/// main thread and answers on `klar://hotkey`.
 #[tauri::command]
 pub fn hotkey_capture(app: AppHandle) {
     let handle = app.clone();
     std::thread::spawn(move || {
-        tracing::info!("rebinding: stopping the engine");
-        crate::stop_engine(&handle);
-
+        tracing::info!("rebinding: waiting for a chord");
         let captured = klar_platform::capture(CAPTURE_TIMEOUT);
 
         let mut settings = Settings::load();
@@ -102,14 +105,19 @@ pub fn hotkey_capture(app: AppHandle) {
             }
         };
 
-        // The engine comes back either way: leaving the app without a hotkey
-        // because the user pressed the wrong key would be the worst outcome
-        // here by some distance.
-        crate::restart_engine(&handle, &settings);
-        settings::broadcast(&handle, &settings);
-
+        // Answer before acting on it. Restarting the engine takes about a
+        // second while the model loads, and the window should not spend that
+        // second still saying "Press a key…".
         if let Err(error) = handle.emit(CAPTURE_EVENT, &result) {
             tracing::warn!(%error, "could not report the captured hotkey");
+        }
+
+        // Only when something changed. A refused chord has left the engine and
+        // its binding exactly as they were, and reloading a model for nothing
+        // would be a second of dead hotkey as the price of a typo.
+        if matches!(result, CaptureResult::Bound { .. }) {
+            crate::restart_engine(&handle, &settings);
+            settings::broadcast(&handle, &settings);
         }
     });
 }
