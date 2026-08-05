@@ -85,6 +85,35 @@ including the VAD's. A context created first writes straight to stderr, where no
 filter can reach it, which is why both `WhisperTranscriber::load` and
 `Vad::load` install them.
 
+### Streaming costs accuracy, and the first settings cost too much
+
+Committing every time the VAD saw 500 ms of quiet produced dictations cut
+mid-sentence, with each fragment recognised on its own:
+
+```
+Мы пойдем в парк кушать. яблоки.
+ничего. не показывать
+от этого прогулка          (спoken: прогона)
+```
+
+Two things going wrong. A 400-500 ms gap is not the end of a sentence, it is
+the gap before the next word. And a fragment of a second or two gives whisper
+far less to work with than the same words inside a whole phrase, so recognition
+genuinely degrades — the last line there is not a cut, it is a misheard word.
+
+What the eager commits bought was measurable: about 180 ms on a ten-second
+dictation, tail versus whole. Against a 500 ms budget that a single pass
+already clears in 320 ms. Paying accuracy for that was the wrong trade.
+
+`min_commit` is now 10 s, so an ordinary dictation is transcribed in one piece
+and streaming changes nothing about it. `commit_silence` is 700 ms and the
+VAD's `min_silence` 600 ms, so a commit means a sentence actually ended.
+Streaming then does what it is for — keeping a long dictation from arriving all
+at once at the end — without touching the common case.
+
+Committed text is also carried forward as whisper's `initial_prompt`, which
+restores most of what a fragment loses by being cut out of its sentence.
+
 ### Committing at pauses, not at window edges
 
 Whisper is much better on a complete phrase than on an arbitrary slice, so the

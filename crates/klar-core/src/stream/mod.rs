@@ -32,8 +32,19 @@ pub struct StreamConfig {
     /// Trailing silence that means "that was a phrase" and triggers a commit.
     pub commit_silence: Duration,
 
-    /// Never commit less than this. Committing a single word costs a whole
-    /// encoder pass to save almost nothing.
+    /// Do not commit until there is at least this much audio.
+    ///
+    /// This is the setting that decides how much streaming costs in accuracy.
+    /// Every commit cuts the audio, and whisper recognises each piece with only
+    /// its own context — a fragment of a second or two comes back noticeably
+    /// worse than the same words inside a whole phrase.
+    ///
+    /// What committing early buys is the difference between transcribing the
+    /// tail and transcribing everything: about 180 ms on a ten-second
+    /// dictation, measured. The budget is 500 ms and the whole pass takes 320.
+    /// So there is no reason to fragment anything a single pass handles
+    /// comfortably, and the threshold sits above the length of an ordinary
+    /// dictation on purpose.
     pub min_commit: Duration,
 
     /// Commit anyway once the uncommitted audio gets this long. A speaker who
@@ -45,9 +56,14 @@ pub struct StreamConfig {
 impl Default for StreamConfig {
     fn default() -> Self {
         Self {
-            partial_interval: Duration::from_millis(700),
-            commit_silence: Duration::from_millis(500),
-            min_commit: Duration::from_millis(1_200),
+            // Partials are for the overlay and are thrown away. Re-recognising
+            // the pending audio competes with the passes that matter, so this
+            // is as slow as it can be while still looking live.
+            partial_interval: Duration::from_secs(1),
+            // Long enough to be the end of a sentence rather than the gap
+            // before the next word.
+            commit_silence: Duration::from_millis(700),
+            min_commit: Duration::from_secs(10),
             max_uncommitted: Duration::from_secs(15),
         }
     }
@@ -166,7 +182,8 @@ impl<'a> Stream<'a> {
         // everything.
         let tail = self.vad.inner().trim(&self.pending)?;
         if !tail.is_empty() {
-            let transcript = self.transcriber.transcribe(&tail, &self.options)?;
+            let options = self.options_with_context();
+            let transcript = self.transcriber.transcribe(&tail, &options)?;
             if !transcript.text.is_empty() {
                 self.committed.push(transcript.text);
             }
@@ -185,6 +202,32 @@ impl<'a> Stream<'a> {
         );
 
         Ok((self.committed.join(" "), self.stats))
+    }
+
+    /// What has been recognised so far, as context for the next piece.
+    ///
+    /// Whisper takes a prompt to bias recognition, and giving it the preceding
+    /// words is most of what a fragment loses by being cut out of its sentence.
+    /// The window is bounded because the prompt shares the text context with
+    /// the output.
+    fn context(&self) -> Option<String> {
+        const MAX_CHARS: usize = 200;
+
+        let joined = self.committed.join(" ");
+        if joined.is_empty() {
+            return None;
+        }
+        let skip = joined.chars().count().saturating_sub(MAX_CHARS);
+        Some(joined.chars().skip(skip).collect())
+    }
+
+    /// Options for one pass, carrying whatever has been recognised already.
+    fn options_with_context(&self) -> TranscribeOptions {
+        let mut options = self.options.clone();
+        if options.initial_prompt.is_none() {
+            options.initial_prompt = self.context();
+        }
+        options
     }
 
     /// Where to cut, if anything should be committed yet.
@@ -231,7 +274,8 @@ impl<'a> Stream<'a> {
         self.stats.committed_audio += samples_to_duration(head_len);
 
         if !speech.is_empty() {
-            let transcript = self.transcriber.transcribe(&speech, &self.options)?;
+            let options = self.options_with_context();
+            let transcript = self.transcriber.transcribe(&speech, &options)?;
             if !transcript.text.is_empty() {
                 self.committed.push(transcript.text);
             }
@@ -254,7 +298,8 @@ impl<'a> Stream<'a> {
         }
 
         self.stats.partials += 1;
-        let transcript = self.transcriber.transcribe(&speech, &self.options)?;
+        let options = self.options_with_context();
+        let transcript = self.transcriber.transcribe(&speech, &options)?;
         if transcript.text == self.partial {
             return Ok(None);
         }
@@ -276,9 +321,16 @@ mod tests {
     #[test]
     fn the_default_commit_gap_is_a_pause_not_a_word_break() {
         let config = StreamConfig::default();
-        assert!(config.commit_silence >= Duration::from_millis(400));
-        // And a commit must be worth an encoder pass.
-        assert!(config.min_commit > config.commit_silence);
+        // 400-500 ms fires between words and cuts sentences in half, which
+        // costs visible accuracy — see the note on min_commit.
+        assert!(config.commit_silence >= Duration::from_millis(600));
+    }
+
+    #[test]
+    fn an_ordinary_dictation_is_never_fragmented() {
+        // A single pass over ten seconds costs 320 ms against a 500 ms budget,
+        // so nothing that short has any reason to be cut up.
+        assert!(StreamConfig::default().min_commit >= Duration::from_secs(10));
     }
 
     #[test]

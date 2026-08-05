@@ -58,10 +58,11 @@ impl Default for VadSettings {
         Self {
             threshold: 0.5,
             min_speech: Duration::from_millis(250),
-            // Longer than Silero's 100 ms default: at 100 ms every gap between
-            // words looks like the end of a sentence, and the stream would
-            // commit mid-phrase.
-            min_silence: Duration::from_millis(400),
+            // Silero defaults to 100 ms, at which every gap between words looks
+            // like the end of a sentence. 400 ms was still too eager in
+            // practice — dictations came back cut mid-phrase, with each
+            // fragment recognised worse for having lost its context.
+            min_silence: Duration::from_millis(600),
             pad: Duration::from_millis(60),
         }
     }
@@ -433,9 +434,9 @@ mod tests {
 
     #[test]
     fn the_default_silence_gap_is_longer_than_a_pause_between_words() {
-        // 100 ms — Silero's own default — fires between words and would make
-        // the stream commit mid-sentence.
-        assert!(VadSettings::default().min_silence >= Duration::from_millis(300));
+        // 100 ms is Silero's default and fires between words; 400 ms was
+        // measured still cutting sentences in half.
+        assert!(VadSettings::default().min_silence >= Duration::from_millis(600));
     }
 
     /// Build a probability track from a description in frames.
