@@ -125,9 +125,9 @@ Select-String -Path C:\kv\build.log `
 Works for `cargo build` the same way. Every whisper.cpp failure so far has been
 one line that this finds and scrolling does not.
 
-#### The Vulkan build runs into MAX_PATH
+#### The Vulkan build needs Ninja on Windows
 
-The first one, under those few thousand warnings:
+Build it with MSBuild and it fails deep inside a path nobody chose:
 
 ```
 Path: cmTC_f87cd.dir\Debug\cmTC_f87cd.tlog\ParallelCustomBuild.write.1.tlog
@@ -135,37 +135,41 @@ exceeds the OS max path limit. The fully qualified file name must be less than
 260 characters.
 ```
 
-Nothing is wrong with Vulkan — it was found, `glslc` was found, every shader
-extension is supported. ggml builds its shader compiler as a nested CMake
-project under `vulkan-shaders-gen-prefix\src\vulkan-shaders-gen-build\`, then
-MSBuild adds `CMakeFiles\CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\Debug\
-cmTC_xxxxx.tlog\`, and from a checkout at `C:\dev\Klar` that lands at exactly
-260 characters. The CUDA build never gets near it because it has no nested
-project.
+and, once shortened just enough to get past that, as the same tree failing to
+find itself:
 
-Give the Vulkan build its own short target directory:
-
-```powershell
-$env:CARGO_TARGET_DIR = "C:\kv"
-cargo run -p klar-cli --features vulkan -- doctor
+```
+error MSB6003: The specified task executable "link.exe" could not be run.
+System.IO.DirectoryNotFoundException: Could not find a part of the path
+'...\vulkan-shaders-gen-prefix\src\vulkan-shaders-gen-build\CMakeFiles\
+CMakeScratch\TryCompile-nt4stu\cmTC_78702.dir\Debug\cmTC_78702.tlog'
 ```
 
-Fourteen characters of headroom, nothing to install, and no administrator. It is
-also the right shape regardless: switching `--features` rebuilds whisper.cpp
-from scratch in a shared target directory, so one directory per backend saves
-that every time you swap.
+Nothing is wrong with Vulkan in either case — it is found, `glslc` is found,
+every shader extension is supported. ggml builds its shader compiler as a
+*nested* CMake project under `vulkan-shaders-gen-prefix\src\vulkan-shaders-gen-build\`,
+MSBuild adds a `CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\Debug\
+cmTC_xxxxx.tlog\` tree beneath that for each compiler probe, and the result sits
+at the edge of what MSBuild handles. The CUDA build never gets near it — it has
+no nested project.
 
-Ninja sidesteps the whole thing — it writes no `.tlog` files and builds
-whisper.cpp considerably faster — if you would rather install something than
-work around a limit:
+Use Ninja. It replaces MSBuild for the whisper.cpp build, creates none of that
+tree, and compiles considerably faster:
 
 ```powershell
 winget install Ninja-build.Ninja
 $env:CMAKE_GENERATOR = "Ninja"          # the cmake crate reads this
 ```
 
-Enabling Win32 long paths does *not* reliably help: the 260 check here is
-MSBuild's own, not the filesystem's.
+A short `CARGO_TARGET_DIR` — `C:\kv` rather than `C:\dev\Klar\target` — buys
+about a dozen characters, which is enough for a debug build and not for a
+release one, where `release\` costs two more than `debug\`. Worth setting
+anyway, since switching `--features` rebuilds whisper.cpp from scratch in a
+shared target directory and one directory per backend saves that every swap. It
+is not a substitute for Ninja.
+
+Enabling Win32 long paths does not reliably help either: the limit being hit is
+MSBuild's handling, not the filesystem's.
 
 macOS needs Xcode command line tools and CMake (`brew install cmake`).
 

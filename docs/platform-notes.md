@@ -101,16 +101,22 @@ report themselves as something else:
   unattended, and unattended is when it skips the machine-wide variable.
   `whisper-rs-sys` then panics with "Please install Vulkan SDK", to somebody who
   just did. Check `C:\VulkanSDK` on disk rather than believing the message.
-- **MAX_PATH.** ggml builds `vulkan-shaders-gen` as a nested CMake project;
-  MSBuild appends `CMakeFiles\CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\
-  Debug\cmTC_xxxxx.tlog\ParallelCustomBuild.write.1.tlog` under it, and from a
-  checkout at `C:\dev\Klar` the result is exactly 260 characters. The failure
-  arrives as `error MSB4018: The "GetOutOfDateItems" task failed unexpectedly`
-  buried in a few thousand lines of CMake policy warnings, with `-- Vulkan
-  found` and every shader extension supported directly above it. A short
-  `CARGO_TARGET_DIR` fixes it; the 260 check is MSBuild's own, so enabling Win32
-  long paths does not reliably help. CUDA never hits this — it has no nested
-  project.
+- **MSBuild cannot build it; use Ninja.** ggml builds `vulkan-shaders-gen` as a
+  nested CMake project, and MSBuild puts a
+  `CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\Debug\cmTC_xxxxx.tlog\` tree
+  under it for every compiler probe. From a checkout at `C:\dev\Klar` that is
+  exactly 260 characters and fails as `MSB4018: The "GetOutOfDateItems" task
+  failed unexpectedly`. Shortening `CARGO_TARGET_DIR` to `C:\kv` buys about a
+  dozen characters — enough for a debug build, not for a release one, where
+  `release\` costs two more than `debug\` and the same tree fails again as
+  `MSB6003: ... link.exe could not be run. DirectoryNotFoundException: Could not
+  find a part of the path ...cmTC_78702.tlog`. Both messages arrive under a few
+  thousand CMake policy warnings with `-- Vulkan found` directly above them.
+
+  `CMAKE_GENERATOR=Ninja` is the fix rather than the workaround: no MSBuild, no
+  scratch tree, and a faster build. Enabling Win32 long paths does not reliably
+  help — what is at its limit is MSBuild's path handling, not the filesystem.
+  CUDA never hits any of this, having no nested project.
 
 ---
 
