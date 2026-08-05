@@ -7,17 +7,6 @@
 use klar_platform::Binding;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-use tauri::{AppHandle, Emitter};
-
-/// Broadcast when the settings change, so every window follows without having
-/// to poll or be told individually. The theme rides on this.
-pub const EVENT: &str = "klar://settings";
-
-pub fn broadcast(app: &AppHandle, settings: &Settings) {
-    if let Err(error) = app.emit(EVENT, settings) {
-        tracing::warn!(%error, "could not tell the windows about a settings change");
-    }
-}
 
 /// Where the finished text goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]

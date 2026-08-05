@@ -65,20 +65,6 @@ export type ModelEvent =
 
 export const MODEL_EVENT = "klar://model";
 
-/** The answer to a `hotkeyCapture`, mirroring `CaptureResult` in
- * `src-tauri/src/commands.rs`. Rust has already saved a bound chord and
- * restarted the engine on it by the time this arrives. */
-export type CaptureResult =
-  | { outcome: "bound"; binding: Binding }
-  | { outcome: "refused"; message: string };
-
-export const HOTKEY_EVENT = "klar://hotkey";
-
-/** Carries the whole `Settings` whenever Rust changes them on its own
- * initiative — today, only after capturing a new hotkey. A window that made the
- * change itself already knows, so `settings_set` deliberately does not
- * broadcast: the echo would race the next change. */
-export const SETTINGS_EVENT = "klar://settings";
 
 /** True when running inside the Tauri shell rather than a plain browser tab. */
 export const inShell = (): boolean => isTauri();
@@ -143,9 +129,10 @@ export const restartEngine = (): Promise<void> => invoke<void>("engine_restart")
 
 export const finishOnboarding = (): Promise<void> => invoke<void>("onboarding_finish");
 
-/** Wait for the user to press a chord and bind it. The answer arrives on
- * {@link HOTKEY_EVENT}; the engine is stopped for the duration. */
-export const captureHotkey = (): Promise<void> => invoke<void>("hotkey_capture");
+/** Wait for the user to press a chord and bind it, resolving with what was
+ * bound. Rejects with the refusal — timed out, cancelled, or a chord Klar will
+ * not take — written for a person. Takes as long as the user does. */
+export const captureHotkey = (): Promise<Binding> => invoke<Binding>("hotkey_capture");
 
 const MODIFIER_GLYPHS: Record<Modifier, { mac: string; other: string }> = {
   control: { mac: "⌃", other: "Ctrl" },

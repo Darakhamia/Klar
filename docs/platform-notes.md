@@ -63,6 +63,28 @@ Because the user can remove it from Task Manager while Klar is not running,
 `settings_get` reports what the registry says rather than what the JSON file
 says. The stored field is what they asked for; the registry is what is true.
 
+### Rebinding worked; the window never heard about it
+
+The log settled it. `rebinding: accepted binding=[Control]+Character('c')`,
+the engine restarted, the hook installed on the new binding, and a dictation
+ran on it thirteen seconds later. The rebind had worked every time. What failed
+was the reply: `emit("klar://hotkey", …)` returned `Ok` and the settings window
+did not react.
+
+So the event never reached the main window — the same window whose live input
+meter is fed by `klar://event`. That is the second time a window has been deaf
+without saying so, and the reason it hid twice is that both subscriptions
+dropped the failure into `console.error` and carried on.
+
+Rebinding no longer uses an event. It is a question the window asked and is
+waiting on, so the answer belongs in the command's return value — one thing
+that has to arrive rather than two, and commands are the part of the bridge
+this window has always been able to use. The remaining subscription passes its
+failure to the UI instead of the console.
+
+The window-level event problem is still open. It costs the meter in Voice and
+nothing else today.
+
 ### `listen` is ACL-gated per window, and a refusal is silent
 
 The overlay and onboarding both subscribed to `klar://event` and both received

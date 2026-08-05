@@ -5,11 +5,11 @@
 
 use crate::downloads::{self, Active};
 use crate::mic::MicTest;
-use crate::settings::{self, Settings};
+use crate::settings::Settings;
 use klar_platform::{Binding, Permission, PermissionState};
 use parking_lot::Mutex;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 
 #[derive(Serialize)]
 pub struct AppVersion {
@@ -70,76 +70,50 @@ pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
     klar_platform::set_launch_at_login(settings.launch_at_login).map_err(|e| e.to_string())
 }
 
-/// Wait for the user to press a chord, and bind it.
+/// Wait for the user to press a chord, bind it, and answer with it.
+///
+/// A returned value rather than an event. Rebinding is a question the window
+/// asked and is waiting on, so the answer belongs in the reply — and an event
+/// is one more thing that has to arrive for the button to come back.
 ///
 /// The engine keeps running throughout. Windows calls the most recently
 /// installed hook first, and the capture hook swallows every non-modifier
 /// key-down it sees, so the engine's push-to-talk hook is never handed the key
-/// and cannot start a dictation out from under the rebind. Stopping the engine
-/// first would only add a thread join to the one path that must not block.
+/// and cannot start a dictation out from under the rebind.
 ///
-/// Blocks for as long as the user takes to press something, so it runs off the
-/// main thread and answers on `klar://hotkey`.
+/// The error is the refusal written for a person — timed out, cancelled, or a
+/// chord Klar will not bind — and is shown as it is.
 #[tauri::command]
-pub fn hotkey_capture(app: AppHandle) {
+pub async fn hotkey_capture(app: AppHandle) -> Result<Binding, String> {
+    tracing::info!("rebinding: waiting for a chord");
+
+    // `capture` blocks for as long as the user takes to press something, which
+    // is not something to do on an async runtime's worker.
+    let binding = tauri::async_runtime::spawn_blocking(|| klar_platform::capture(CAPTURE_TIMEOUT))
+        .await
+        .map_err(|error| format!("the capture task failed: {error}"))?
+        .inspect_err(|error| tracing::info!(%error, "rebinding: refused"))
+        .map_err(|error| error.to_string())?;
+
+    tracing::info!(?binding, "rebinding: accepted");
+
+    let mut settings = Settings::load();
+    settings.hotkey = binding.clone();
+    settings.save()?;
+
+    // Off this thread so the window gets its answer now: restarting reloads the
+    // model, which is about a second, and nothing about the reply depends on it.
     let handle = app.clone();
     std::thread::spawn(move || {
-        tracing::info!("rebinding: waiting for a chord");
-        let captured = klar_platform::capture(CAPTURE_TIMEOUT);
-
-        let mut settings = Settings::load();
-        let result = match captured {
-            Ok(binding) => {
-                tracing::info!(?binding, "rebinding: accepted");
-                settings.hotkey = binding.clone();
-                match settings.save() {
-                    Ok(()) => CaptureResult::Bound { binding },
-                    Err(message) => CaptureResult::Refused { message },
-                }
-            }
-            Err(error) => {
-                tracing::info!(%error, "rebinding: refused");
-                CaptureResult::Refused {
-                    message: error.to_string(),
-                }
-            }
-        };
-
-        // Answer before acting on it. Restarting the engine takes about a
-        // second while the model loads, and the window should not spend that
-        // second still saying "Press a key…".
-        if let Err(error) = handle.emit(CAPTURE_EVENT, &result) {
-            tracing::warn!(%error, "could not report the captured hotkey");
-        }
-
-        // Only when something changed. A refused chord has left the engine and
-        // its binding exactly as they were, and reloading a model for nothing
-        // would be a second of dead hotkey as the price of a typo.
-        if matches!(result, CaptureResult::Bound { .. }) {
-            crate::restart_engine(&handle, &settings);
-            settings::broadcast(&handle, &settings);
-        }
+        crate::restart_engine(&handle, &settings);
     });
+
+    Ok(binding)
 }
 
 /// How long the user has to press something before capture gives up. Long
 /// enough to find a key, short enough that a forgotten capture ends itself.
 const CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-
-pub const CAPTURE_EVENT: &str = "klar://hotkey";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase", tag = "outcome")]
-enum CaptureResult {
-    Bound {
-        binding: Binding,
-    },
-    /// Timed out, cancelled with Escape, or a chord Klar will not bind. The
-    /// message is written for a person and shown as it is.
-    Refused {
-        message: String,
-    },
-}
 
 /// Start the engine again on whatever is now on disk.
 ///

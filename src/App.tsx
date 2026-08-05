@@ -9,11 +9,11 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ENGINE_EVENT,
-  SETTINGS_EVENT,
   appVersion,
   inShell,
   subscribe,
   type AppVersion,
+  type Binding,
   type EngineEvent,
 } from "./lib/ipc";
 import {
@@ -71,21 +71,23 @@ export function App() {
   // second audio stream open just to draw a bar.
   useEffect(() => {
     if (!inShell()) return;
-    return subscribe<EngineEvent>(ENGINE_EVENT, (payload) => {
-      if (payload.kind === "level") setLevel(payload.peak);
-      if (payload.kind === "state") setLevel(0);
-    });
+    return subscribe<EngineEvent>(
+      ENGINE_EVENT,
+      (payload) => {
+        if (payload.kind === "level") setLevel(payload.peak);
+        if (payload.kind === "state") setLevel(0);
+      },
+      // A refused subscription used to reach nothing but the console, which is
+      // how a window sat deaf for a milestone. It is an error like any other.
+      setError,
+    );
   }, []);
 
-  // Rust changes the settings on its own only after capturing a hotkey, and
-  // this is how the row finds out. It is a local update, not a save — the
-  // binding is already on disk by the time this arrives.
-  useEffect(() => {
-    if (!inShell()) return;
-    return subscribe<Settings>(SETTINGS_EVENT, (next) => {
-      applyAppearance(next.appearance);
-      setLocal(next);
-    });
+  // A rebind is already saved and applied by the time it answers, so this only
+  // brings the window's copy up to date — otherwise the next save would write
+  // the old binding back over it.
+  const rebound = useCallback((hotkey: Binding) => {
+    setLocal((previous) => (previous ? { ...previous, hotkey } : previous));
   }, []);
 
   // Every change is saved and applied immediately. There is no Save button:
@@ -129,7 +131,12 @@ export function App() {
 
         <div className="panel__body">
           {settings && section === "General" && (
-            <General settings={settings} os={version?.os ?? "windows"} onChange={update} />
+            <General
+              settings={settings}
+              os={version?.os ?? "windows"}
+              onChange={update}
+              onRebound={rebound}
+            />
           )}
           {settings && section === "Voice" && (
             <Voice
