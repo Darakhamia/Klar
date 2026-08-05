@@ -56,6 +56,24 @@ about latency. Its speed against CUDA on the same card is unmeasured, and until
 somebody runs `klar-cli --features vulkan dictate` on real hardware, "Vulkan
 works" means it runs.
 
+Two Windows traps sit between installing the SDK and getting a build, and both
+report themselves as something else:
+
+- **`VULKAN_SDK` is not set for you.** `winget` runs the LunarG installer
+  unattended, and unattended is when it skips the machine-wide variable.
+  `whisper-rs-sys` then panics with "Please install Vulkan SDK", to somebody who
+  just did. Check `C:\VulkanSDK` on disk rather than believing the message.
+- **MAX_PATH.** ggml builds `vulkan-shaders-gen` as a nested CMake project;
+  MSBuild appends `CMakeFiles\CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\
+  Debug\cmTC_xxxxx.tlog\ParallelCustomBuild.write.1.tlog` under it, and from a
+  checkout at `C:\dev\Klar` the result is exactly 260 characters. The failure
+  arrives as `error MSB4018: The "GetOutOfDateItems" task failed unexpectedly`
+  buried in a few thousand lines of CMake policy warnings, with `-- Vulkan
+  found` and every shader extension supported directly above it. A short
+  `CARGO_TARGET_DIR` fixes it; the 260 check is MSBuild's own, so enabling Win32
+  long paths does not reliably help. CUDA never hits this — it has no nested
+  project.
+
 ---
 
 ## M6 — interface

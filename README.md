@@ -107,6 +107,49 @@ The build needs `$VULKAN_SDK\Lib\vulkan-1.lib` to link and `$VULKAN_SDK\Bin\glsl
 to compile the shaders, both of which it finds from that one variable. None of
 it is needed to *run* Klar — see [Which GPU build](#which-gpu-build).
 
+#### The Vulkan build runs into MAX_PATH
+
+Then it fails again, under a few thousand lines of CMake policy warnings. The
+one line that matters is this:
+
+```
+Path: cmTC_f87cd.dir\Debug\cmTC_f87cd.tlog\ParallelCustomBuild.write.1.tlog
+exceeds the OS max path limit. The fully qualified file name must be less than
+260 characters.
+```
+
+Nothing is wrong with Vulkan — it was found, `glslc` was found, every shader
+extension is supported. ggml builds its shader compiler as a nested CMake
+project under `vulkan-shaders-gen-prefix\src\vulkan-shaders-gen-build\`, then
+MSBuild adds `CMakeFiles\CMakeScratch\TryCompile-xxxxxx\cmTC_xxxxx.dir\Debug\
+cmTC_xxxxx.tlog\`, and from a checkout at `C:\dev\Klar` that lands at exactly
+260 characters. The CUDA build never gets near it because it has no nested
+project.
+
+Give the Vulkan build its own short target directory:
+
+```powershell
+$env:CARGO_TARGET_DIR = "C:\kv"
+cargo run -p klar-cli --features vulkan -- doctor
+```
+
+Fourteen characters of headroom, nothing to install, and no administrator. It is
+also the right shape regardless: switching `--features` rebuilds whisper.cpp
+from scratch in a shared target directory, so one directory per backend saves
+that every time you swap.
+
+Ninja sidesteps the whole thing — it writes no `.tlog` files and builds
+whisper.cpp considerably faster — if you would rather install something than
+work around a limit:
+
+```powershell
+winget install Ninja-build.Ninja
+$env:CMAKE_GENERATOR = "Ninja"          # the cmake crate reads this
+```
+
+Enabling Win32 long paths does *not* reliably help: the 260 check here is
+MSBuild's own, not the filesystem's.
+
 macOS needs Xcode command line tools and CMake (`brew install cmake`).
 
 ```sh
