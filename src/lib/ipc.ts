@@ -18,8 +18,13 @@ export interface AppVersion {
 export type Modifier = "control" | "alt" | "shift" | "meta";
 
 /** Mirrors `Key` in `crates/klar-platform/src/hotkey.rs`. Serde writes the unit
- * variants as strings and the two that carry a value as one-key objects. */
-export type Key = "space" | "fn" | { function: number } | { character: string };
+ * variants as strings and the ones that carry a value as one-key objects. */
+export type Key =
+  | "space"
+  | "fn"
+  | { function: number }
+  | { character: string }
+  | { code: number };
 
 export interface Binding {
   modifiers: Modifier[];
@@ -161,7 +166,11 @@ function keyLabel(key: Key): string {
   if (key === "space") return "Space";
   if (key === "fn") return "fn";
   if ("function" in key) return `F${String(key.function)}`;
-  return key.character.toUpperCase();
+  if ("character" in key) return key.character.toUpperCase();
+  // A key that types nothing and has no portable name — Tab, Insert, an arrow.
+  // Named would be nicer; inventing a name in TypeScript for a code only the
+  // platform layer understands would be worse.
+  return `KEY ${key.code.toString(16).toUpperCase().padStart(2, "0")}`;
 }
 
 /** Render a binding the way the design writes it: `CTRL SPACE`, `⌥ SPACE`. */

@@ -2,19 +2,55 @@
 
 use crate::{Binding, HIGHEST_FUNCTION_KEY, Key, Modifier};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_F1, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
-    VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_SPACE,
+    GetAsyncKeyState, MAPVK_VK_TO_CHAR, MapVirtualKeyW, VIRTUAL_KEY, VK_CONTROL, VK_F1,
+    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN,
+    VK_SHIFT, VK_SPACE, VkKeyScanW,
 };
 
-/// Windows has no constants for the letter and digit keys: their virtual key
-/// codes are the ASCII codes of the uppercase character.
-const fn character_key(character: char) -> Option<VIRTUAL_KEY> {
-    let upper = character.to_ascii_uppercase();
-    if upper.is_ascii_alphanumeric() {
-        Some(VIRTUAL_KEY(upper as u16))
-    } else {
-        None
+/// The character a key produces unshifted, on the layout in use right now, or
+/// `None` for keys that produce nothing — Tab, Insert, the arrows.
+///
+/// Layout-dependent by design: the point is that the binding reads as the key
+/// cap the user pressed. A layout switch can move it, which is the same
+/// bargain every other application makes with letter shortcuts.
+fn character_of(code: u32) -> Option<char> {
+    // SAFETY: no pointers; takes and returns integers.
+    let mapped = unsafe { MapVirtualKeyW(code, MAPVK_VK_TO_CHAR) };
+
+    // Zero means the key produces nothing. The top bit marks a dead key, which
+    // is not something to bind either.
+    if mapped == 0 || mapped & 0x8000_0000 != 0 {
+        return None;
     }
+
+    let character = char::from_u32(mapped & 0xFFFF)?;
+    // Control codes come back for Tab, Enter and Backspace — those are keys
+    // that do something rather than type something.
+    (!character.is_control()).then(|| character.to_ascii_lowercase())
+}
+
+/// The virtual key for a character, on the layout in use right now.
+fn key_of_character(character: char) -> Option<VIRTUAL_KEY> {
+    // Letters and digits have fixed virtual keys — the ASCII code of the
+    // uppercase character — and are asked for by name rather than by layout,
+    // so a Cyrillic layout does not lose them.
+    if character.is_ascii_alphanumeric() {
+        return Some(VIRTUAL_KEY(character.to_ascii_uppercase() as u16));
+    }
+
+    let mut buffer = [0_u16; 2];
+    let encoded = character.encode_utf16(&mut buffer);
+    let unit = *encoded.first()?;
+
+    // SAFETY: takes a UTF-16 code unit by value; no pointers.
+    let scanned = unsafe { VkKeyScanW(unit) };
+    if scanned == -1 {
+        return None;
+    }
+
+    // The low byte is the virtual key; the high byte is the shift state needed
+    // to type it, which is not part of the binding — the physical key is.
+    Some(VIRTUAL_KEY((scanned as u16) & 0x00FF))
 }
 
 /// The virtual key a binding's trigger corresponds to, or `None` for keys that
@@ -27,27 +63,34 @@ pub fn virtual_key(key: Key) -> Option<VIRTUAL_KEY> {
             Some(VIRTUAL_KEY(VK_F1.0 + u16::from(number) - 1))
         }
         Key::Function(_) => None,
-        Key::Character(character) => character_key(character),
+        Key::Character(character) => key_of_character(character),
+        Key::Code(code) => u16::try_from(code).ok().map(VIRTUAL_KEY),
         // macOS only; there is no Windows equivalent to bind.
         Key::Fn => None,
     }
 }
 
-/// The [`Key`] a virtual key code corresponds to, or `None` for the ones Klar
-/// will not bind. The inverse of [`virtual_key`], used while capturing a chord.
-pub fn key_from_virtual(code: u32) -> Option<Key> {
+/// The [`Key`] a virtual key code corresponds to. The inverse of
+/// [`virtual_key`], used while capturing a chord.
+///
+/// Never `None`: every key is bindable, and one with no name of its own is
+/// carried by its code rather than refused.
+pub fn key_from_virtual(code: u32) -> Key {
     if code == u32::from(VK_SPACE.0) {
-        return Some(Key::Space);
+        return Key::Space;
     }
 
     let first_function = u32::from(VK_F1.0);
-    if (first_function..first_function + u32::from(HIGHEST_FUNCTION_KEY)).contains(&code) {
-        let number = u8::try_from(code - first_function).ok()? + 1;
-        return Some(Key::Function(number));
+    if (first_function..first_function + u32::from(HIGHEST_FUNCTION_KEY)).contains(&code)
+        && let Ok(offset) = u8::try_from(code - first_function)
+    {
+        return Key::Function(offset + 1);
     }
 
-    let character = char::from_u32(code)?;
-    Key::from_character(character)
+    match character_of(code) {
+        Some(character) => Key::Character(character),
+        None => Key::Code(code),
+    }
 }
 
 /// True for the modifier keys themselves, which complete no chord on their own.
@@ -135,13 +178,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_bindable_key_has_a_virtual_key() {
+    fn every_named_key_has_a_virtual_key() {
         let mut keys = vec![Key::Space];
         keys.extend((1..=HIGHEST_FUNCTION_KEY).map(Key::Function));
         keys.extend(
             "abcdefghijklmnopqrstuvwxyz0123456789"
                 .chars()
-                .map(|c| Key::from_character(c).expect("letters and digits are keys")),
+                .map(Key::Character),
         );
 
         for key in keys {
@@ -163,7 +206,7 @@ mod tests {
         ];
         for key in keys {
             let vk = virtual_key(key).expect("bindable");
-            assert_eq!(key_from_virtual(u32::from(vk.0)), Some(key));
+            assert_eq!(key_from_virtual(u32::from(vk.0)), key);
         }
     }
 
@@ -172,16 +215,34 @@ mod tests {
         // Windows reports the uppercase code for a letter key whether or not
         // Shift is held; the binding stores one spelling so it renders the same
         // way every time.
-        assert_eq!(key_from_virtual(0x44), Some(Key::Character('d')));
+        assert_eq!(key_from_virtual(0x44), Key::Character('d'));
     }
 
     #[test]
-    fn keys_klar_will_not_bind_have_no_mapping() {
-        // F13 — beyond what is on a keyboard, and beyond what we map.
+    fn a_key_with_no_name_is_carried_by_its_code_rather_than_refused() {
+        // Punctuation depends on the layout, so what it maps to is not
+        // asserted — only that it is never thrown away.
+        for code in [0xBF, 0xBC, 0xBE, 0xDC, 0xDE, 0x09, 0x2D, 0x25] {
+            let key = key_from_virtual(code);
+            assert!(
+                matches!(key, Key::Character(_) | Key::Code(_)),
+                "{code:#04x} came back as {key:?}"
+            );
+            assert!(key.is_valid(), "{key:?} should be bindable");
+        }
+    }
+
+    #[test]
+    fn a_raw_code_maps_straight_back_to_its_virtual_key() {
+        assert_eq!(virtual_key(Key::Code(0x2D)), Some(VIRTUAL_KEY(0x2D)));
+        // Beyond a u16, so not a virtual key at all.
+        assert_eq!(virtual_key(Key::Code(0xFFFF_0000)), None);
+    }
+
+    #[test]
+    fn function_numbers_outside_the_keyboard_have_no_mapping() {
         assert_eq!(virtual_key(Key::Function(13)), None);
         assert_eq!(virtual_key(Key::Function(0)), None);
-        // Escape. Reserved for cancelling the capture itself.
-        assert_eq!(key_from_virtual(0x1B), None);
 
         assert!(is_modifier_key(u32::from(VK_LCONTROL.0)));
         assert!(!is_modifier_key(u32::from(VK_SPACE.0)));

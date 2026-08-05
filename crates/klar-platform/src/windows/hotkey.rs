@@ -239,10 +239,9 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
 
     tracing::info!(vk = format!("{code:#04x}"), mask, seen, "chord captured");
 
-    let key = keys::key_from_virtual(code).ok_or(BadBinding::UnsupportedKey)?;
     let binding = Binding {
         modifiers: keys::modifiers_from_mask(mask),
-        key,
+        key: keys::key_from_virtual(code),
     };
     binding.check()?;
 

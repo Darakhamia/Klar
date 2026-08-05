@@ -46,9 +46,14 @@ pub enum Modifier {
 
 /// The non-modifier key that completes a binding.
 ///
-/// The hook only swallows this key while the binding's modifiers are also
-/// held, so binding a letter costs nothing the rest of the time. Bound *bare*
-/// is the dangerous case, which is what [`Self::is_bindable_alone`] is for.
+/// Any key will do. The hook only swallows it while the binding's modifiers are
+/// also held, so binding one costs nothing the rest of the time. Bound *bare*
+/// is the case that needs care, which is what [`Self::is_bindable_alone`] is
+/// for.
+///
+/// The named variants exist so the common bindings read as themselves in the
+/// settings file and on screen. Everything else is carried by the platform's
+/// own key code rather than dropped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Key {
@@ -58,38 +63,40 @@ pub enum Key {
     Fn,
     /// F1 to F12. Anything higher is not on the keyboards people have.
     Function(u8),
-    /// A letter or a digit, held lowercase: `a`–`z`, `0`–`9`.
+    /// A key that types something: `a`, `7`, `/`, `,`. Held as the character it
+    /// produces unshifted, which is what makes it recognisable in the settings
+    /// file and on the key cap.
     Character(char),
+    /// A key that types nothing and has no portable name — Tab, Insert, an
+    /// arrow — carried by the platform's own key code.
+    ///
+    /// Windows virtual-key codes today. macOS will need its own mapping when it
+    /// gets a backend, and a settings file does not travel between the two.
+    /// Storing the code rather than a name keeps every key bindable without a
+    /// table of every key that exists.
+    Code(u32),
 }
 
 /// The highest function key Klar will bind.
 pub const HIGHEST_FUNCTION_KEY: u8 = 12;
 
 impl Key {
-    /// A letter or digit as a [`Key`], or `None` for anything else.
-    pub fn from_character(character: char) -> Option<Self> {
-        let lowered = character.to_ascii_lowercase();
-        lowered
-            .is_ascii_alphanumeric()
-            .then_some(Self::Character(lowered))
-    }
-
-    /// True for keys that mean nothing on their own, and so may be bound
-    /// without a modifier.
+    /// True for keys that may be bound without a modifier.
     ///
-    /// Space and the character keys may not: bound bare, the hook would
-    /// swallow every one the user typed, everywhere, for as long as Klar runs.
+    /// The rule is what the key does when Klar is not looking: a key that types
+    /// a character must not be bound bare, because the hook would swallow every
+    /// one the user typed, everywhere, for as long as Klar runs. A key that
+    /// types nothing — a function key, Insert — costs nothing to hold.
     pub const fn is_bindable_alone(self) -> bool {
-        matches!(self, Self::Function(_) | Self::Fn)
+        matches!(self, Self::Function(_) | Self::Fn | Self::Code(_))
     }
 
-    /// Whether this is a key at all, as opposed to a number outside the range
-    /// or a character that is not a letter or a digit.
+    /// Whether this is a key at all, as opposed to a function number outside
+    /// the range that exists.
     pub const fn is_valid(self) -> bool {
         match self {
-            Self::Space | Self::Fn => true,
+            Self::Space | Self::Fn | Self::Character(_) | Self::Code(_) => true,
             Self::Function(number) => number >= 1 && number <= HIGHEST_FUNCTION_KEY,
-            Self::Character(character) => character.is_ascii_alphanumeric(),
         }
     }
 }
@@ -100,11 +107,13 @@ impl Key {
 /// window shows, and every case has a different fix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum BadBinding {
-    #[error("Klar binds a letter, a digit, Space or F1–F12. That key is none of them.")]
+    /// Reachable only for a key the platform itself will not report — `fn` on
+    /// Windows, or a function number past what exists.
+    #[error("That key cannot be used for push-to-talk on this system.")]
     UnsupportedKey,
 
     #[error(
-        "That key needs a modifier — Ctrl, Alt, Shift or Win. \
+        "That key types something, so it needs a modifier — Ctrl, Alt, Shift or Win. \
          Bound on its own, Klar would swallow it everywhere you type."
     )]
     NeedsModifier,

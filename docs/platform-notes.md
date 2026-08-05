@@ -82,20 +82,40 @@ the app's push-to-talk hook is also installed.
 Two halves that fail independently need one log, not two. This should have gone
 in at M6 with the first window.
 
-### The capture hook, when it is not the only hook
+### It was never the hooks. It was the list of keys.
 
-Still open. What is known: capture works from the CLI, where no push-to-talk
-hook exists; in the app it works sometimes and reports nothing pressed the
-rest. The difference is the second hook.
+`klar-cli rebind --with-hook` settled it: two hooks coexist exactly as
+documented, the capture one wins the key, and one run printed
 
-Two things went in to narrow it. The push-to-talk hook now stands down entirely
-while `CAPTURING` is set, so it cannot swallow a key or start a dictation
-whichever order Windows calls the two in — the documented order is
-most-recently-installed first, which should make capture always win, but that
-assumption is exactly what has not held up. And the capture hook counts every
-event it is handed before any filtering, so a timeout now reports whether the
-callback was called at all. Zero is a dead hook; a non-zero count with no chord
-is a filter that is too strict. The outcome alone could not tell those apart.
+```
+chord captured vk="0xbf" mask=1 seen=2
+refused   Klar binds a letter, a digit, Space or F1–F12. That key is none of them.
+```
+
+`0xBF` is the `/` key. The hook had seen everything all along; the key set
+refused it, and refused `,` `.` `\` `'` with it — which is most of what a person
+reaches for when they want a hotkey that is not already taken. Four rounds of
+looking at the wrong layer, when a message the user could see was naming the
+real problem the whole time.
+
+There is no key set now. Capture never rejects a key: it names the common ones,
+and anything else is carried by its virtual key code rather than dropped. The
+character variant is resolved through `MapVirtualKeyW(MAPVK_VK_TO_CHAR)` and
+back through `VkKeyScanW`, so `/` reads as `/` on the layout it was pressed on.
+Letters and digits keep their fixed virtual keys instead, so a Cyrillic layout
+does not lose them.
+
+One rule survives, and it is about what the key does rather than which key it
+is: a key that types a character needs a modifier, because bound bare the hook
+would swallow every one the user typed. A key that types nothing — a function
+key, Insert, an arrow — may be bound alone.
+
+The diagnostic that made the difference stays in. The capture hook counts every
+event it is handed before any filtering, and a timeout logs the count: zero is a
+dead hook, non-zero with no chord is a filter that is too strict. So is the
+push-to-talk hook standing down while `CAPTURING` is set — it was not the
+problem, but it removes an ordering assumption that would otherwise still be
+load-bearing.
 
 ### `listen` is ACL-gated per window, and a refusal is silent
 

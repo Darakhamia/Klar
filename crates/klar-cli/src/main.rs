@@ -660,7 +660,7 @@ fn rebind(args: &RebindArgs) -> Result<()> {
         println!("push-to-talk hook registered on {binding:?} and left running.");
     }
 
-    println!("press a chord — a modifier and a letter, digit, Space or F-key.");
+    println!("press a chord — any key, with a modifier held. F-keys need none.");
     println!("Escape cancels. {} seconds.", WAIT.as_secs());
 
     match klar_platform::capture(WAIT) {

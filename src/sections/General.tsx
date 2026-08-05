@@ -103,7 +103,7 @@ function Hotkey({
   // While capturing, the next key pressed anywhere is swallowed, so the row
   // says what to do rather than leaving the old binding looking live.
   const hint = capturing
-    ? "Hold a modifier and press a letter, a digit, Space or an F-key. Escape cancels."
+    ? "Press any key, with Ctrl, Alt, Shift or Win held. Function keys need no modifier. Escape cancels."
     : (refused ?? "Hold to dictate. Release to insert.");
 
   return (
