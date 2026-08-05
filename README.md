@@ -13,6 +13,11 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
+**M3 passed on Windows.** Transcription runs during speech and commits at
+pauses, so key release leaves only the tail: median 260 ms from key-up to
+inserted text against a 500 ms criterion. A 22-second dictation streams 21.8 s
+of it while the user is still talking.
+
 **M2 passed on Windows.** Hold Ctrl+Space anywhere, speak, release, and the
 text appears at the cursor — 315 ms from key-up, injection 5 ms of that.
 Verified into Notepad, a browser field, VS Code and a messenger; the clipboard

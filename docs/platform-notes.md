@@ -9,6 +9,39 @@ Newest first.
 
 ## M3 — streaming
 
+### Measured
+
+Key-up to inserted text, `dictate` on the RTX 5070 Ti, mixed Russian dictations
+of 2-22 seconds:
+
+| | |
+|---|---|
+| Median | 260 ms |
+| Worst | 537 ms |
+| Criterion | median under 500 ms |
+
+A dictation long enough to commit shows the point of the whole exercise: 21.8 s
+streamed during speech, 1.1 s of tail, 163 ms from key-up. The same length
+without streaming would have been a single pass over the lot.
+
+Note the worst case is a dense ten-second utterance in one pass — more words
+means more decoder steps, and that is what the tail time tracks, not the audio
+length.
+
+### A diagnosis that did not hold up
+
+Repetition loops were attributed to the `initial_prompt` feedback, on the
+strength of four dictations where the loops coincided with commits. A later run
+on the same binary produced two commits and clean text, and another produced a
+repeat with no commits at all. The likelier cause was the speaker saying the
+same line five times over, which whisper is known to turn into a decoder loop
+on its own.
+
+The prompt feedback stayed removed regardless — it was speculative, it carries
+a known repetition risk, and `min_commit` already gives committed pieces enough
+context. But the reasoning in the commit that removed it claimed more than the
+evidence supported.
+
 ### Silero without a second inference runtime
 
 CLAUDE.md called for the `voice_activity_detector` crate. It pulls `ort`, which
