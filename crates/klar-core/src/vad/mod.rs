@@ -176,20 +176,22 @@ impl Vad {
         )))
     }
 
-    /// Drop everything that is not speech, keeping the segments in order.
+    /// Cut the silence off the ends, keeping everything between.
     ///
-    /// Used before a final transcription: whisper charges for silence and
-    /// hallucinates into it.
+    /// Deliberately *not* splicing out the pauses in the middle. Whisper's
+    /// encoder runs over a fixed 30-second window whatever it is given, so
+    /// removing internal silence saves no time at all — while butting phrases
+    /// against each other produces audio no speaker ever made, which the model
+    /// has every reason to handle badly.
+    ///
+    /// The ends are worth cutting: leading and trailing silence is where
+    /// whisper invents text to fill the gap.
     pub fn trim(&mut self, samples: &[f32]) -> Result<Vec<f32>, AsrError> {
         let segments = self.segments(samples)?;
-        if segments.is_empty() {
+        let (Some(first), Some(last)) = (segments.first(), segments.last()) else {
             return Ok(Vec::new());
-        }
-        let mut kept = Vec::with_capacity(segments.iter().map(Segment::len).sum());
-        for segment in segments {
-            kept.extend_from_slice(&samples[segment.start..segment.end]);
-        }
-        Ok(kept)
+        };
+        Ok(samples[first.start..last.end].to_vec())
     }
 }
 
@@ -282,25 +284,27 @@ impl StreamingVad {
         Some(samples_to_duration(self.analysed.saturating_sub(last.end)))
     }
 
-    /// Keep only the speech in `buffer[..end]`, using the probabilities already
-    /// computed.
+    /// The span of `buffer[..end]` that holds speech, silence trimmed off the
+    /// ends and the pauses in the middle left alone — see [`Vad::trim`].
     ///
-    /// No model run at all — this is why the analysis is kept. Calling the
-    /// one-shot `trim` here instead would re-detect over the whole buffer on
-    /// every partial and put back exactly the cost [`advance`] exists to avoid.
+    /// Uses the probabilities already computed, with no model run at all. This
+    /// is why the analysis is kept: calling the one-shot detector here would
+    /// re-detect over the whole buffer on every partial and put back exactly
+    /// the cost [`advance`] exists to avoid.
     ///
     /// [`advance`]: Self::advance
     pub fn speech(&self, buffer: &[f32], end: usize) -> Vec<f32> {
         let end = end.min(buffer.len()).min(self.analysed);
-        let mut kept = Vec::new();
-        for segment in self.segments() {
-            let start = segment.start.min(end);
-            let stop = segment.end.min(end);
-            if start < stop {
-                kept.extend_from_slice(&buffer[start..stop]);
-            }
+        let segments = self.segments();
+        let (Some(first), Some(last)) = (segments.first(), segments.last()) else {
+            return Vec::new();
+        };
+        let start = first.start.min(end);
+        let stop = last.end.min(end);
+        if start >= stop {
+            return Vec::new();
         }
-        kept
+        buffer[start..stop].to_vec()
     }
 
     /// The underlying detector, for the one-shot calls that finalisation makes.

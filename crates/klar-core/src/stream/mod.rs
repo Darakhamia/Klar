@@ -182,8 +182,7 @@ impl<'a> Stream<'a> {
         // everything.
         let tail = self.vad.inner().trim(&self.pending)?;
         if !tail.is_empty() {
-            let options = self.options_with_context();
-            let transcript = self.transcriber.transcribe(&tail, &options)?;
+            let transcript = self.transcriber.transcribe(&tail, &self.options)?;
             if !transcript.text.is_empty() {
                 self.committed.push(transcript.text);
             }
@@ -204,31 +203,18 @@ impl<'a> Stream<'a> {
         Ok((self.committed.join(" "), self.stats))
     }
 
-    /// What has been recognised so far, as context for the next piece.
-    ///
-    /// Whisper takes a prompt to bias recognition, and giving it the preceding
-    /// words is most of what a fragment loses by being cut out of its sentence.
-    /// The window is bounded because the prompt shares the text context with
-    /// the output.
-    fn context(&self) -> Option<String> {
-        const MAX_CHARS: usize = 200;
-
-        let joined = self.committed.join(" ");
-        if joined.is_empty() {
-            return None;
-        }
-        let skip = joined.chars().count().saturating_sub(MAX_CHARS);
-        Some(joined.chars().skip(skip).collect())
-    }
-
-    /// Options for one pass, carrying whatever has been recognised already.
-    fn options_with_context(&self) -> TranscribeOptions {
-        let mut options = self.options.clone();
-        if options.initial_prompt.is_none() {
-            options.initial_prompt = self.context();
-        }
-        options
-    }
+    // Feeding the recognised text back as whisper's `initial_prompt` was tried
+    // here, to give a committed fragment the context it loses by being cut out
+    // of its sentence. It sent the decoder into repetition loops:
+    //
+    //   Разбрызгиваю переспокомнатие, чтобы почувствовать себя живым
+    //   Разбрызгиваю переспокомнатие, чтобы почувствовать себя живым
+    //   Разбрызгива переспокомнатие
+    //
+    // Prompt conditioning causing whisper to repeat is well known, and the
+    // loops appeared in exactly the dictations that had commits. The context it
+    // restored was not worth a failure mode that mangles the output, and
+    // `min_commit` already keeps fragments long enough to carry their own.
 
     /// Where to cut, if anything should be committed yet.
     ///
@@ -274,8 +260,7 @@ impl<'a> Stream<'a> {
         self.stats.committed_audio += samples_to_duration(head_len);
 
         if !speech.is_empty() {
-            let options = self.options_with_context();
-            let transcript = self.transcriber.transcribe(&speech, &options)?;
+            let transcript = self.transcriber.transcribe(&speech, &self.options)?;
             if !transcript.text.is_empty() {
                 self.committed.push(transcript.text);
             }
@@ -298,8 +283,7 @@ impl<'a> Stream<'a> {
         }
 
         self.stats.partials += 1;
-        let options = self.options_with_context();
-        let transcript = self.transcriber.transcribe(&speech, &options)?;
+        let transcript = self.transcriber.transcribe(&speech, &self.options)?;
         if transcript.text == self.partial {
             return Ok(None);
         }

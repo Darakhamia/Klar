@@ -85,6 +85,37 @@ including the VAD's. A context created first writes straight to stderr, where no
 filter can reach it, which is why both `WhisperTranscriber::load` and
 `Vad::load` install them.
 
+### Feeding the transcript back as a prompt sends whisper into loops
+
+To give a committed fragment the context it loses by being cut out of its
+sentence, the recognised text was passed to the next pass as whisper's
+`initial_prompt`. The decoder started repeating:
+
+```
+Разбрызгиваю переспокомнатие, чтобы почувствовать себя живым
+Разбрызгиваю переспокомнатие, чтобы почувствовать себя живым
+Разбрызгива переспокомнатие
+```
+
+and, in another run, five consecutive copies of the same three words with one
+of them corrupted. Prompt conditioning causing whisper to repeat itself is a
+known pathology, and the loops appeared in exactly the dictations that had
+commits — never in the ones that finished in a single pass.
+
+Removed. The context it restored was not worth a failure mode that mangles the
+output, and `min_commit` already keeps committed pieces long enough to carry
+their own context.
+
+### Splicing out internal pauses buys nothing and costs quality
+
+`trim` concatenated the speech segments, dropping the silence between them.
+That saves no time whatsoever: whisper's encoder runs over a fixed 30-second
+window regardless of how much audio is in it. What it does do is butt phrases
+against one another, producing audio no speaker ever made.
+
+It now cuts the ends only — leading and trailing silence, which is where
+whisper invents text to fill the gap — and leaves the middle alone.
+
 ### Streaming costs accuracy, and the first settings cost too much
 
 Committing every time the VAD saw 500 ms of quiet produced dictations cut
