@@ -277,16 +277,19 @@ cargo run -p klar-cli --features vulkan -- dictate     # what does it cost?
 
 Vulkan is the portable answer and the one to build for anybody who is not on
 NVIDIA. It compiles, its device probe is exercised in CI, and it runs: on an
-RTX 5070 Ti it took **307 ms** from key-up to inserted text against a 500 ms
-criterion, on the same machine where CUDA measures a 260 ms median. Two
-dictations is not M3's twenty, so treat that as a first reading rather than a
-result — but it is the right order of magnitude, which is what the decision
-between one installer and two rests on.
+RTX 5070 Ti, **median 296 ms** from key-up to inserted text over four
+dictations, worst 317 ms, against a 500 ms criterion — on the same machine where
+CUDA measures a 260 ms median. Four is not M3's twenty, so treat it as a reading
+rather than a pass, but it is the right order of magnitude, which is what the
+decision between one installer and two rests on.
 
-The first dictation on that run took **17.4 seconds**. Vulkan compiles its
-compute pipelines the first time each shader is used, and loading a model
-touches none of them, so the cost landed on whoever spoke first. It is now paid
-inside model load instead — see `WhisperTranscriber::warm`.
+The very first dictation on the first Vulkan run took **17.4 seconds**. Vulkan
+compiles its compute pipelines the first time each shader is used, and loading a
+model touches none of them, so the cost landed on whoever spoke first. Model
+load now runs a throwaway inference to move it — see `WhisperTranscriber::warm`,
+whose comment is honest that the 17 seconds has not been seen again and that a
+400 ms warm-up cannot have paid for it. NVIDIA's on-disk shader cache is the
+likely reason, and nobody has tested against a cleared one.
 
 Two installers built from the same version produce the same filename, so rename
 them (`Klar_x.y.z_x64-setup.exe` → `…-cuda-setup.exe`, `…-vulkan-setup.exe`)

@@ -67,11 +67,25 @@ Not variance — Vulkan builds its compute pipelines lazily, the first time each
 shader is needed, and loading a model touches none of them: the model loaded in
 873 ms and reported itself ready with every pipeline still uncompiled.
 
-The cost cannot be removed, only moved. `WhisperTranscriber::load` now runs one
-throwaway inference over a second of silence before returning, so it is paid
-where the interface already says the model is loading rather than in somebody's
-first sentence — 17 seconds of "loading" reads as start-up; 17 seconds after
-releasing the hotkey reads as broken.
+`WhisperTranscriber::load` now runs one throwaway inference over a second of
+silence before returning, so whatever that cost is gets paid where the interface
+already says the model is loading rather than in somebody's first sentence —
+17 seconds of "loading" reads as start-up; 17 seconds after releasing the hotkey
+reads as broken.
+
+**Whether it absorbs the 17 seconds is not established.** On the run that added
+the pass it took 401 ms, and the first dictation took 289 ms. A 401 ms pass has
+not paid a 17-second bill; the pipelines were already compiled. The obvious
+explanation is NVIDIA's on-disk shader cache, which persists across process
+restarts — meaning the 17 seconds was a once-per-machine cost already spent by
+the earlier run, and that run would have been fast with or without this change.
+The test that separates the two is a run against a cleared driver cache, and
+nobody has done it.
+
+Keep the pass regardless. On the reading where it matters it converts a
+broken-looking first dictation into a slower load; on the reading where it does
+not, it costs 400 ms at start-up. Neither is a reason to remove it, and the
+comment on `warm` says so rather than claiming the win.
 
 The language is pinned for that pass rather than detected. Detection on silence
 returns noise, and the throwaway transcript is discarded regardless; pinning

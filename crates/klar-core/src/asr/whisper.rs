@@ -122,9 +122,19 @@ impl WhisperTranscriber {
     /// 17.4 seconds against a 500 ms criterion, and the second took 307 ms.
     /// CUDA pays a smaller version of the same cost.
     ///
-    /// That cost cannot be removed, only moved. It belongs here, inside a load
-    /// the interface already reports as loading, rather than in somebody's
-    /// first sentence — where it does not look like start-up, it looks broken.
+    /// Whatever that cost is, it belongs here — inside a load the interface
+    /// already reports as loading — rather than in somebody's first sentence,
+    /// where it does not look like start-up, it looks broken.
+    ///
+    /// **How much of it this actually absorbs is unproven.** On the run that
+    /// added this, the pass took 401 ms and the first dictation took 289 ms:
+    /// consistent with the pipelines already being compiled, which is what
+    /// NVIDIA's on-disk shader cache would do, since it survives a process
+    /// restart. A pass that cheap has not paid a 17-second bill. Distinguishing
+    /// the two needs a run against a cleared driver cache, which nobody has
+    /// done. Keep the pass either way: on the reading where it matters, it is
+    /// the difference between a slow load and a broken-looking first sentence,
+    /// and on the reading where it does not, it costs 400 ms of start-up.
     ///
     /// A second of silence: whisper pads anything shorter than its 30-second
     /// window regardless, so this is a full encoder pass. The language is
