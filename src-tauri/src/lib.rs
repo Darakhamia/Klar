@@ -49,6 +49,7 @@ pub fn run() {
             commands::hotkey_suspend,
             commands::hotkey_set,
             commands::ui_log,
+            commands::reveal_log,
             commands::onboarding_finish,
         ])
         .setup(|app| {

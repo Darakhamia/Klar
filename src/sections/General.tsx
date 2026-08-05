@@ -3,6 +3,7 @@ import { Figure, Row, Segmented, Select } from "../components/Row";
 import {
   formatBinding,
   note,
+  revealLog,
   setHotkey,
   suspendHotkey,
   type Binding,
@@ -67,6 +68,13 @@ export function General({
             onChange({ ...settings, appearance });
           }}
         />
+      </Row>
+
+      <Row
+        label="Diagnostics"
+        hint="Klar keeps a log on this machine and sends nothing anywhere. If something goes wrong, this is the file to attach."
+      >
+        <RevealLog />
       </Row>
 
       <Row label="Overlay position" hint="Where the overlay appears while you speak.">
@@ -200,5 +208,25 @@ function Hotkey({
         {capturing ? "Press a key…" : "Change"}
       </button>
     </Row>
+  );
+}
+
+/** Opens the file manager with the newest log selected. */
+function RevealLog() {
+  const [failed, setFailed] = useState<string | null>(null);
+
+  return (
+    <button
+      type="button"
+      className="btn"
+      onClick={() => {
+        setFailed(null);
+        revealLog().catch((cause: unknown) => {
+          setFailed(cause instanceof Error ? cause.message : String(cause));
+        });
+      }}
+    >
+      {failed ?? "Show log file"}
+    </button>
   );
 }

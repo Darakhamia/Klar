@@ -100,6 +100,27 @@ macOS: hardened runtime, Developer ID signing, notarization, DMG. Windows: code 
 
 **Done when:** a build installs and runs on a machine that has never had a developer toolchain on it.
 
+Windows, part done. What that criterion was actually failing on was not signing:
+the installer would not *start* on a machine without the CUDA Toolkit, because
+whisper.cpp links the CUDA runtime dynamically and Windows gives up at load time
+with a missing-DLL box, before any of our code can explain itself. `build.rs`
+now collects those three libraries and the bundle carries them beside the
+executable, so the criterion is reachable.
+
+Signing is configured and unsigned. The digest and the RFC 3161 timestamp URL
+are set — the timestamp being the part people forget, without which a signature
+dies with its certificate — and only the thumbprint is missing, because a
+certificate has to be bought and issued to a named person. `README.md` has the
+one line that turns it on, and the self-signed rehearsal worth doing first.
+
+Log export is done and it is not a nicety: Klar has no crash reporter and sends
+nothing anywhere, so a problem on somebody's machine reaches nobody unless they
+can find the log in one click. Settings → Diagnostics → Show log file.
+
+Not done: auto-update, which needs a release channel to update from and a
+keypair, and building it before either exists is scaffolding; and all of macOS,
+whose platform backend is still a stub.
+
 ---
 
 ## Working agreement

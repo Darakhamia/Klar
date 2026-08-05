@@ -69,7 +69,10 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser"
-      }
+      },
+      "certificateThumbprint": null,
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "http://timestamp.digicert.com"
     }
   }
 }

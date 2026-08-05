@@ -122,6 +122,69 @@ pub fn hotkey_set(
     Ok(binding)
 }
 
+/// Show the log file in Explorer, selected and ready to attach to a message.
+///
+/// Klar has no crash reporter and sends nothing anywhere, so the only way a
+/// problem on somebody's machine reaches anybody is if they can find the log
+/// and hand it over. That has to be one click rather than a path they are
+/// expected to type.
+#[tauri::command]
+pub fn reveal_log() -> Result<(), String> {
+    let dir = crate::logging::log_dir().ok_or("no app data directory")?;
+
+    // The newest file rather than the directory: the appender rolls daily, and
+    // the one that matters is almost always today's.
+    let newest = std::fs::read_dir(&dir)
+        .map_err(|error| format!("{}: {error}", dir.display()))?
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .max_by_key(|entry| {
+            entry
+                .metadata()
+                .and_then(|meta| meta.modified())
+                .unwrap_or(std::time::UNIX_EPOCH)
+        });
+
+    match newest {
+        Some(file) => reveal(&file.path()),
+        // No log yet is not a failure worth an error: the folder is still the
+        // right place to be looking.
+        None => reveal(&dir),
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn reveal(path: &std::path::Path) -> Result<(), String> {
+    let argument = if path.is_dir() {
+        path.display().to_string()
+    } else {
+        format!("/select,{}", path.display())
+    };
+
+    std::process::Command::new("explorer.exe")
+        .arg(argument)
+        // Explorer returns a non-zero exit code even when it worked, so its
+        // status says nothing and is deliberately not checked.
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open Explorer: {error}"))
+}
+
+#[cfg(target_os = "macos")]
+fn reveal(path: &std::path::Path) -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("-R")
+        .arg(path)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("could not open Finder: {error}"))
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+fn reveal(_path: &std::path::Path) -> Result<(), String> {
+    Err("not implemented on this platform".to_owned())
+}
+
 /// Let a window write into the same log file the Rust side uses.
 ///
 /// Not a general logging facility, and not for chatter. It exists because the

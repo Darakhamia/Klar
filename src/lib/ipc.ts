@@ -150,6 +150,11 @@ export const restartEngine = (): Promise<void> => invoke<void>("engine_restart")
 
 export const finishOnboarding = (): Promise<void> => invoke<void>("onboarding_finish");
 
+/** Show Klar's log file in the file manager, selected. Klar sends nothing
+ * anywhere, so this is the only route a problem takes from somebody's machine
+ * to anybody who can read it. */
+export const revealLog = (): Promise<void> => invoke<void>("reveal_log");
+
 /** Stop or resume the push-to-talk hook while the window reads a chord. Without
  * this the hook swallows the current hotkey before the window sees it, and
  * starts a dictation instead. */

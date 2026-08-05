@@ -8,6 +8,10 @@
 /dist
 *.tsbuildinfo
 
+# NVIDIA's CUDA runtime, copied in by src-tauri/build.rs so the installer can
+# carry it. Their files, not ours, and regenerated on every build.
+/src-tauri/cuda-runtime
+
 # Whisper models — downloaded at runtime into the app data dir, and a copy here
 # during development. Hundreds of megabytes; never committed.
 /models

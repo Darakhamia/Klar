@@ -164,24 +164,78 @@ npm run lint
 
 ```powershell
 npm install
-npm run tauri build -- --features cuda
+npm run tauri build -- --features cuda --config src-tauri/tauri.cuda.conf.json
 ```
 
 The installer lands in `src-tauri/target/release/bundle/nsis/`. It installs for
 the current user only, so it needs no administrator.
 
-Two things this build is not yet, both of them M7's job:
+`--features cuda` matters: without it the build works, runs on the CPU, and
+misses the latency budget by an order of magnitude. The extra `--config` is what
+packages the CUDA runtime — see below. Leave both off and you get a working CPU
+installer.
 
-- **It is unsigned.** SmartScreen will warn on first run — "More info" then "Run
-  anyway". Code signing is what removes that, and it needs a certificate.
-- **It expects the CUDA runtime on the machine.** whisper.cpp links the CUDA
-  DLLs dynamically, so a machine without the CUDA Toolkit gets a missing-DLL
-  error before Klar starts. Fine on the machine that built it; not yet something
-  to hand to somebody else.
+### Why the CUDA runtime is bundled
 
-`--features cuda` matters. Without it the build works, runs on the CPU, and
-misses the latency budget by an order of magnitude.
+whisper.cpp links `cudart`, `cublas` and `cublasLt` dynamically, so a machine
+without the CUDA Toolkit cannot start Klar at all: it fails at load time with a
+missing-DLL box, before any Klar code runs and before anything can explain
+itself. The toolkit is a multi-gigabyte developer download and nobody should
+need it to use a dictation app.
 
-## Licence
+`src-tauri/build.rs` copies those three libraries out of `%CUDA_PATH%\bin` into
+`src-tauri/cuda-runtime/`, and `tauri.cuda.conf.json` packages them beside the
+executable, which is where Windows looks. NVIDIA permits redistributing them
+with an application.
+
+They are in a separate config file because Tauri treats a resource glob that
+matches nothing as an error, and a CPU build has nothing to match.
+
+### Code signing
+
+Unsigned, Windows SmartScreen shows "Windows protected your PC" on first run and
+hides the Run button behind "More info". That is not a bug to work around — it
+is Windows saying it does not know who wrote this, which is true.
+
+Signing needs a certificate, which has to be bought and issued to a named person
+or company. Everything else is already configured: `bundle.windows` carries the
+SHA-256 digest and an RFC 3161 timestamp URL, and the timestamp is the part
+people forget — without it the signature dies with the certificate and every
+copy already installed stops verifying.
+
+With a certificate in the Windows certificate store, one line makes builds
+signed:
+
+```powershell
+# The thumbprint of the certificate, from certmgr.msc or:
+Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Format-List Subject, Thumbprint
+```
+
+Put it in `src-tauri/tauri.conf.json` under `bundle.windows.certificateThumbprint`.
+Modern OV and EV certificates live on a hardware token or in a cloud HSM rather
+than in the store; those need `bundle.windows.signCommand` instead, pointing at
+the vendor's signing tool.
+
+A self-signed certificate is worth ten minutes before buying one: it proves the
+whole pipeline signs, timestamps and installs, and it changes nothing about
+SmartScreen, which trusts issuers rather than signatures.
+
+```powershell
+$cert = New-SelfSignedCertificate -Type CodeSigning -Subject "CN=Klar Test" `
+  -CertStoreLocation Cert:\CurrentUser\My
+$cert.Thumbprint
+```
+
+### Still to do before this goes to anyone else
+
+- **Auto-update.** Not built. `tauri-plugin-updater` needs somewhere to publish
+  to and a signing keypair, and building the machinery before there is a release
+  channel is the definition of scaffolding. When there is one, this is an
+  afternoon.
+- **macOS.** Hardened runtime, Developer ID, notarization and a DMG, none of
+  which can be prepared from a Windows machine, and the platform backend is
+  still a stub.
+
+## Licence## Licence
 
 MIT.
