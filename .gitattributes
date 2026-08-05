@@ -1,0 +1,13 @@
+# Everything is LF in the repository. Without this, git on Windows rewrites
+# line endings on checkout and then reports files as modified that nobody
+# touched — which blocks `git pull` on a file the developer never edited.
+* text=auto eol=lf
+
+# Anything the toolchain generates or that is not text at all.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.bin binary
+*.wav binary
