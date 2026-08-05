@@ -45,6 +45,7 @@ pub fn run() {
             commands::model_download,
             commands::mic_test_start,
             commands::mic_test_stop,
+            commands::hotkey_capture,
             commands::onboarding_finish,
         ])
         .setup(|app| {
@@ -93,6 +94,18 @@ pub fn run() {
             tracing::error!(%error, "tauri failed to start");
             std::process::exit(1);
         });
+}
+
+/// Stop the engine, releasing its keyboard hook and its loaded model.
+///
+/// Used before capturing a new binding: two hooks on the same key would race,
+/// and the running one would win by starting a dictation.
+pub fn stop_engine(app: &AppHandle) {
+    if let Some(running) = app.try_state::<Running>()
+        && let Some(previous) = running.0.lock().take()
+    {
+        previous.stop();
+    }
 }
 
 /// Stop whatever is running and start again with these settings.

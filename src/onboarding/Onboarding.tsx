@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { appVersion, finishOnboarding, inShell, permissionStates } from "../lib/ipc";
 import { getSettings, type Settings } from "../lib/settings";
+import { applyAppearance } from "../lib/theme";
 import { Accessibility } from "./Accessibility";
 import { Microphone } from "./Microphone";
 import { Setup } from "./Setup";
@@ -43,6 +44,7 @@ export function Onboarding() {
         const gated = permissions.some(
           (report) => report.permission === "accessibility" && report.state !== "notApplicable",
         );
+        applyAppearance(loaded.appearance);
         setOs(app.os);
         setSettings(loaded);
         setSteps(gated ? ["microphone", "accessibility", "setup"] : ["microphone", "setup"]);

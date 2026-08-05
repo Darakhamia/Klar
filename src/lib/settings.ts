@@ -12,6 +12,7 @@ export type FinishAction = "type" | "copy" | "typeAndCopy";
 export type OverlayPosition = "bottomCentre" | "nearCursor" | "topCentre";
 export type Processing = "local" | "cloud";
 export type Cleanup = "verbatim" | "light" | "balanced" | "heavy";
+export type Appearance = "system" | "light" | "dark";
 
 export interface Settings {
   hotkey: Binding;
@@ -23,6 +24,8 @@ export interface Settings {
   model: string;
   microphone: string | null;
   cleanup: Cleanup;
+  appearance: Appearance;
+  onboarded: boolean;
 }
 
 export interface ModelStatus {

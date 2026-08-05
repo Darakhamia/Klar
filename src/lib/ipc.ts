@@ -16,7 +16,21 @@ export interface AppVersion {
 }
 
 export type Modifier = "control" | "alt" | "shift" | "meta";
-export type Key = "space" | "fn" | "f1" | "f2" | "f3" | "f4";
+export type Key =
+  | "space"
+  | "fn"
+  | "f1"
+  | "f2"
+  | "f3"
+  | "f4"
+  | "f5"
+  | "f6"
+  | "f7"
+  | "f8"
+  | "f9"
+  | "f10"
+  | "f11"
+  | "f12";
 
 export interface Binding {
   modifiers: Modifier[];
@@ -61,6 +75,21 @@ export type ModelEvent =
   | { phase: "failed"; id: string; message: string };
 
 export const MODEL_EVENT = "klar://model";
+
+/** The answer to a `hotkeyCapture`, mirroring `CaptureResult` in
+ * `src-tauri/src/commands.rs`. Rust has already saved a bound chord and
+ * restarted the engine on it by the time this arrives. */
+export type CaptureResult =
+  | { outcome: "bound"; binding: Binding }
+  | { outcome: "refused"; message: string };
+
+export const HOTKEY_EVENT = "klar://hotkey";
+
+/** Carries the whole `Settings` whenever Rust changes them on its own
+ * initiative — today, only after capturing a new hotkey. A window that made the
+ * change itself already knows, so `settings_set` deliberately does not
+ * broadcast: the echo would race the next change. */
+export const SETTINGS_EVENT = "klar://settings";
 
 /** True when running inside the Tauri shell rather than a plain browser tab. */
 export const inShell = (): boolean => isTauri();
@@ -125,6 +154,10 @@ export const restartEngine = (): Promise<void> => invoke<void>("engine_restart")
 
 export const finishOnboarding = (): Promise<void> => invoke<void>("onboarding_finish");
 
+/** Wait for the user to press a chord and bind it. The answer arrives on
+ * {@link HOTKEY_EVENT}; the engine is stopped for the duration. */
+export const captureHotkey = (): Promise<void> => invoke<void>("hotkey_capture");
+
 const MODIFIER_GLYPHS: Record<Modifier, { mac: string; other: string }> = {
   control: { mac: "⌃", other: "Ctrl" },
   alt: { mac: "⌥", other: "Alt" },
@@ -139,6 +172,14 @@ const KEY_LABELS: Record<Key, string> = {
   f2: "F2",
   f3: "F3",
   f4: "F4",
+  f5: "F5",
+  f6: "F6",
+  f7: "F7",
+  f8: "F8",
+  f9: "F9",
+  f10: "F10",
+  f11: "F11",
+  f12: "F12",
 };
 
 /** Render a binding the way the design writes it: `CTRL SPACE`, `⌥ SPACE`. */

@@ -5,11 +5,11 @@
 
 use crate::downloads::{self, Active};
 use crate::mic::MicTest;
-use crate::settings::Settings;
+use crate::settings::{self, Settings};
 use klar_platform::{Binding, Permission, PermissionState};
 use parking_lot::Mutex;
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 #[derive(Serialize)]
 pub struct AppVersion {
@@ -41,9 +41,18 @@ pub struct PermissionReport {
 }
 
 /// Everything the user has chosen.
+///
+/// `launch_at_login` comes back from the OS rather than from the file: the user
+/// can remove the startup entry from Task Manager without Klar running, and a
+/// toggle still reading On would be a lie.
 #[tauri::command]
 pub fn settings_get() -> Settings {
-    Settings::load()
+    let mut settings = Settings::load();
+    match klar_platform::launch_at_login() {
+        Ok(on) => settings.launch_at_login = on,
+        Err(error) => tracing::warn!(%error, "could not read the startup entry"),
+    }
+    settings
 }
 
 /// Replace the settings and restart the engine so they take effect.
@@ -54,7 +63,69 @@ pub fn settings_get() -> Settings {
 pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
     settings.save()?;
     crate::restart_engine(&app, &settings);
-    Ok(())
+
+    // Last, and reported separately: the rest of the settings have already
+    // taken effect, and a registry that refused the write is worth a message
+    // rather than throwing the whole save away.
+    klar_platform::set_launch_at_login(settings.launch_at_login).map_err(|e| e.to_string())
+}
+
+/// Wait for the user to press a chord, and bind it.
+///
+/// The engine is stopped first: its hook owns the current binding, and pressing
+/// it to rebind it would start a dictation instead. Blocks for as long as the
+/// user takes, so it runs off the main thread and answers on `klar://hotkey`.
+#[tauri::command]
+pub fn hotkey_capture(app: AppHandle) {
+    let handle = app.clone();
+    std::thread::spawn(move || {
+        crate::stop_engine(&handle);
+
+        let captured = klar_platform::capture(CAPTURE_TIMEOUT);
+
+        let mut settings = Settings::load();
+        let result = match captured {
+            Ok(binding) => {
+                settings.hotkey = binding.clone();
+                match settings.save() {
+                    Ok(()) => CaptureResult::Bound { binding },
+                    Err(message) => CaptureResult::Refused { message },
+                }
+            }
+            Err(error) => CaptureResult::Refused {
+                message: error.to_string(),
+            },
+        };
+
+        // The engine comes back either way: leaving the app without a hotkey
+        // because the user pressed the wrong key would be the worst outcome
+        // here by some distance.
+        crate::restart_engine(&handle, &settings);
+        settings::broadcast(&handle, &settings);
+
+        if let Err(error) = handle.emit(CAPTURE_EVENT, &result) {
+            tracing::warn!(%error, "could not report the captured hotkey");
+        }
+    });
+}
+
+/// How long the user has to press something before capture gives up. Long
+/// enough to find a key, short enough that a forgotten capture ends itself.
+const CAPTURE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+
+pub const CAPTURE_EVENT: &str = "klar://hotkey";
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase", tag = "outcome")]
+enum CaptureResult {
+    Bound {
+        binding: Binding,
+    },
+    /// Timed out, cancelled with Escape, or a chord Klar will not bind. The
+    /// message is written for a person and shown as it is.
+    Refused {
+        message: String,
+    },
 }
 
 /// Start the engine again on whatever is now on disk.

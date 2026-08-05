@@ -32,6 +32,25 @@ pub fn open_permission_settings(_permission: Permission) -> Result<(), PlatformE
     Err(PlatformError::NotImplemented("macOS backend"))
 }
 
+pub fn copy_to_clipboard(_text: &str) -> Result<(), PlatformError> {
+    Err(PlatformError::NotImplemented("NSPasteboard"))
+}
+
+/// macOS registers a login item through `SMAppService`, not a file the app
+/// writes. Reporting `false` rather than erroring keeps the settings row honest
+/// on a platform where nothing has been registered.
+pub fn launch_at_login() -> Result<bool, PlatformError> {
+    Ok(false)
+}
+
+pub fn set_launch_at_login(_on: bool) -> Result<(), PlatformError> {
+    Err(PlatformError::NotImplemented("SMAppService login item"))
+}
+
+pub fn capture_binding(_timeout: std::time::Duration) -> Result<Binding, PlatformError> {
+    Err(PlatformError::NotImplemented("CGEventTap capture"))
+}
+
 struct MacHotkey;
 
 impl Hotkey for MacHotkey {

@@ -11,7 +11,7 @@ pub mod hotkey;
 pub mod inject;
 pub mod permissions;
 
-pub use hotkey::{Binding, Hotkey, HotkeyEvent, Key, Modifier};
+pub use hotkey::{BadBinding, Binding, Hotkey, HotkeyEvent, Key, Modifier, capture};
 pub use inject::{InjectionMethod, TextInjector};
 pub use permissions::{Permission, PermissionState};
 
@@ -51,6 +51,11 @@ pub enum PlatformError {
     #[error("hotkey unavailable: {0}")]
     Hotkey(String),
 
+    /// The chord the user pressed cannot be used. Carried through as itself so
+    /// the settings window can show the specific reason.
+    #[error("{0}")]
+    Binding(#[from] BadBinding),
+
     /// The OS call failed for a reason worth reporting verbatim.
     #[error("{0}")]
     Os(String),
@@ -89,9 +94,61 @@ pub fn open_permission_settings(permission: Permission) -> Result<(), PlatformEr
     backend::open_permission_settings(permission)
 }
 
+/// Put `text` on the clipboard and leave it there.
+///
+/// The opposite of what [`TextInjector`] does — injection borrows the clipboard
+/// and gives it back. This is for the user asking for the text to be copied, in
+/// which case replacing what was there is the whole point.
+pub fn copy_to_clipboard(text: &str) -> Result<(), PlatformError> {
+    backend::copy_to_clipboard(text)
+}
+
+/// Whether Klar is registered to start when the user logs in.
+pub fn launch_at_login() -> Result<bool, PlatformError> {
+    backend::launch_at_login()
+}
+
+/// Register or unregister Klar for launch at login.
+///
+/// Windows calls this "Start with Windows" and it is a value under the current
+/// user's `Run` key — no elevation, and nothing outside the user's own hive.
+pub fn set_launch_at_login(on: bool) -> Result<(), PlatformError> {
+    backend::set_launch_at_login(on)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn space_may_not_be_bound_on_its_own() {
+        let bare = Binding {
+            modifiers: vec![],
+            key: Key::Space,
+        };
+        assert_eq!(bare.check(), Err(BadBinding::NeedsModifier));
+
+        let with_modifier = Binding {
+            modifiers: vec![Modifier::Control],
+            key: Key::Space,
+        };
+        assert_eq!(with_modifier.check(), Ok(()));
+    }
+
+    #[test]
+    fn a_function_key_needs_no_modifier() {
+        let bare = Binding {
+            modifiers: vec![],
+            key: Key::F9,
+        };
+        assert_eq!(bare.check(), Ok(()));
+    }
+
+    #[test]
+    fn both_defaults_are_bindings_klar_would_accept() {
+        assert_eq!(Binding::windows_default().check(), Ok(()));
+        assert_eq!(Binding::macos_default().check(), Ok(()));
+    }
 
     #[test]
     fn default_binding_matches_the_platform() {

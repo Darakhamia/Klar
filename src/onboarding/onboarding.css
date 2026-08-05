@@ -260,7 +260,9 @@
 
 .ob-progress__track {
   height: 6px;
-  background: var(--color-neutral-800);
+  /* Mixed from the ink rather than taken from the ramp, so the empty part of
+     the bar stays a shade of the background in both shells. */
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
 }
 
 .ob-progress__fill {

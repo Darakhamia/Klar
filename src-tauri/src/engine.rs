@@ -5,6 +5,7 @@
 //! The frontend never drives it — it only listens. Every state change is an
 //! event, and the overlay renders from those and holds no state of its own.
 
+use crate::settings::FinishAction;
 use klar_core::asr::{TranscribeOptions, WhisperTranscriber};
 use klar_core::audio::{self, BlockConverter, Capture, CaptureConfig};
 use klar_core::stream::{Stream, StreamConfig, Update};
@@ -49,6 +50,7 @@ pub struct EngineConfig {
     pub language: Option<String>,
     pub device: Option<String>,
     pub hotkey: Binding,
+    pub finish: FinishAction,
     pub stream: StreamConfig,
 }
 
@@ -59,6 +61,7 @@ impl Default for EngineConfig {
             language: None,
             device: None,
             hotkey: klar_platform::default_binding(),
+            finish: FinishAction::default(),
             stream: StreamConfig::default(),
         }
     }
@@ -71,15 +74,16 @@ impl From<&crate::settings::Settings> for EngineConfig {
             language: settings.language.clone(),
             device: settings.microphone.clone(),
             hotkey: settings.hotkey.clone(),
+            finish: settings.on_finish,
             stream: StreamConfig::default(),
         }
     }
 }
 
-/// Handle to the running engine. Dropping it stops the hotkey.
+/// Handle to the running engine. Dropping it stops the hotkey and waits for it.
 pub struct Engine {
     stop: Arc<AtomicBool>,
-    _thread: std::thread::JoinHandle<()>,
+    thread: Option<std::thread::JoinHandle<()>>,
 }
 
 impl Engine {
@@ -107,18 +111,37 @@ impl Engine {
 
         Self {
             stop,
-            _thread: thread,
+            thread: Some(thread),
         }
     }
 
-    pub fn stop(&self) {
+    /// Stop, and wait for the keyboard hook to actually come down.
+    ///
+    /// Waiting matters: the caller's next move is to install another hook, and
+    /// for the moment both are registered they both match the same key. When
+    /// the caller is about to capture a new binding, the old hook winning that
+    /// race means pressing the key to rebind it starts a dictation instead.
+    ///
+    /// It costs the length of one poll — the engine checks between hotkey
+    /// waits, 100 ms apart — and the engine thread never waits on the caller,
+    /// so this cannot deadlock against the main thread.
+    pub fn stop(mut self) {
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
+        if let Some(thread) = self.thread.take()
+            && thread.join().is_err()
+        {
+            tracing::error!("the dictation engine thread panicked");
+        }
     }
 }
 
 impl Drop for Engine {
     fn drop(&mut self) {
-        self.stop();
+        self.shutdown();
     }
 }
 
@@ -320,19 +343,39 @@ fn dictate(
     // through, and the state machine passes through Polishing untouched.
     apply(app, &mut machine, Input::Polished(text.clone()));
 
-    let injected = injector.inject(&text);
-    match injected {
-        Ok(method) => {
-            tracing::info!(
-                ?method,
-                commits = stats.commits,
-                tail_ms = stats.tail_elapsed.as_millis() as u64,
-                "dictation delivered"
-            );
-            apply(app, &mut machine, Input::Injected);
-            Ok(())
+    let delivered = deliver(&text, config.finish, injector).map_err(|e| e.to_string())?;
+
+    tracing::info!(
+        method = ?delivered,
+        finish = ?config.finish,
+        commits = stats.commits,
+        tail_ms = stats.tail_elapsed.as_millis() as u64,
+        "dictation delivered"
+    );
+    apply(app, &mut machine, Input::Injected);
+    Ok(())
+}
+
+/// Put the finished text wherever the user asked for it.
+///
+/// `None` for the copy-only path: nothing was injected, so there is no method
+/// to report.
+fn deliver(
+    text: &str,
+    finish: FinishAction,
+    injector: &mut dyn klar_platform::TextInjector,
+) -> Result<Option<klar_platform::InjectionMethod>, klar_platform::PlatformError> {
+    match finish {
+        FinishAction::Type => injector.inject(text).map(Some),
+        FinishAction::Copy => klar_platform::copy_to_clipboard(text).map(|()| None),
+        FinishAction::TypeAndCopy => {
+            // Injection borrows the clipboard and puts back what was there, so
+            // the copy has to come after it — the other order would be undone
+            // by the restore.
+            let method = injector.inject(text)?;
+            klar_platform::copy_to_clipboard(text)?;
+            Ok(Some(method))
         }
-        Err(error) => Err(error.to_string()),
     }
 }
 

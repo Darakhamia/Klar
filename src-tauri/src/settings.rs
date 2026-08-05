@@ -7,6 +7,17 @@
 use klar_platform::Binding;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tauri::{AppHandle, Emitter};
+
+/// Broadcast when the settings change, so every window follows without having
+/// to poll or be told individually. The theme rides on this.
+pub const EVENT: &str = "klar://settings";
+
+pub fn broadcast(app: &AppHandle, settings: &Settings) {
+    if let Err(error) = app.emit(EVENT, settings) {
+        tracing::warn!(%error, "could not tell the windows about a settings change");
+    }
+}
 
 /// Where the finished text goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -16,6 +27,19 @@ pub enum FinishAction {
     Type,
     Copy,
     TypeAndCopy,
+}
+
+/// Which of the two shells the windows are drawn in.
+///
+/// The design ships both. `System` follows the OS, which is what a resident
+/// app should do unless told otherwise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -64,6 +88,7 @@ pub struct Settings {
     /// Device name, or `None` for the system default.
     pub microphone: Option<String>,
     pub cleanup: Cleanup,
+    pub appearance: Appearance,
     /// Whether first-run setup has been completed. False on a fresh install and
     /// on an install that predates onboarding — running through it again costs
     /// a few seconds when everything is already downloaded.
@@ -82,6 +107,7 @@ impl Default for Settings {
             model: klar_core::model::DEFAULT_MODEL.to_owned(),
             microphone: None,
             cleanup: Cleanup::default(),
+            appearance: Appearance::default(),
             onboarded: false,
         }
     }

@@ -8,16 +8,24 @@
 //! - **Elevation** — a paste into a higher-integrity window is dropped without
 //!   an error, so it is detected up front. See [`elevation`].
 
+mod autostart;
 mod clipboard;
 mod elevation;
 mod hotkey;
 mod inject;
 mod keys;
 
+pub use autostart::{launch_at_login, set_launch_at_login};
+pub use hotkey::capture_binding;
+
 use crate::{Hotkey, Permission, PermissionState, PlatformError, TextInjector};
 
 pub fn hotkey() -> Box<dyn Hotkey> {
     Box::new(hotkey::WindowsHotkey::new())
+}
+
+pub fn copy_to_clipboard(text: &str) -> Result<(), PlatformError> {
+    clipboard::set_text(text)
 }
 
 pub fn injector() -> Box<dyn TextInjector> {

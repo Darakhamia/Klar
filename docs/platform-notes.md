@@ -9,6 +9,42 @@ Newest first.
 
 ## M6 — interface
 
+### Rebinding needs a second hook, not a mode on the first
+
+The push-to-talk hook and a capture hook want opposite things: one swallows a
+known key forever, the other swallows one unknown key once. Threading a mode
+through `HookContext` would have put a branch in the callback that runs inside
+the system's input path, where every added test is paid for on every keystroke
+on the machine.
+
+So capture is its own `WH_KEYBOARD_LL` hook on its own thread, with its own
+thread-local, and the engine is stopped for the duration. That last part is not
+optional: while both hooks are installed they both match the same key, and if
+the old one wins, pressing the hotkey to rebind it starts a dictation instead.
+
+Which is why `Engine::stop` now joins rather than setting a flag and walking
+away. It costs one poll interval — 100 ms — and it is safe against the main
+thread: with Tauri's `tracing` feature off, `emit` from a background thread
+posts to the event proxy and returns, so the engine thread never waits on the
+thread that is joining it.
+
+Modifiers are read with `GetAsyncKeyState` at the instant of the key-down and
+sent as a bitmask, not a `Vec`: the callback must not allocate. Modifier
+key-downs are passed through rather than captured — the user is still building
+the chord, and swallowing Ctrl would stop the next key seeing it held.
+
+### Start with Windows is one registry value
+
+`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. No elevation, nothing
+outside the user's own hive, and it shows up in Task Manager's Startup tab
+where users go to turn things off. The value is quoted, because Windows splits
+an unquoted Run value on spaces and `C:\Program Files\Klar\klar.exe` would be
+run as `C:\Program`.
+
+Because the user can remove it from Task Manager while Klar is not running,
+`settings_get` reports what the registry says rather than what the JSON file
+says. The stored field is what they asked for; the registry is what is true.
+
 ### `listen` is ACL-gated per window, and a refusal is silent
 
 The overlay and onboarding both subscribed to `klar://event` and both received

@@ -16,11 +16,13 @@
 //!   user cannot see.
 
 use super::keys;
-use crate::{Binding, Hotkey, HotkeyEvent, PlatformError};
+use crate::{BadBinding, Binding, Hotkey, HotkeyEvent, PlatformError};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{RecvTimeoutError, Sender, channel};
+use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
+use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
 use windows::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, KBDLLHOOKSTRUCT, MSG, PostThreadMessageW, SetWindowsHookExW,
     UnhookWindowsHookEx, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN, WM_SYSKEYUP,
@@ -131,6 +133,153 @@ impl Drop for WindowsHotkey {
     fn drop(&mut self) {
         let _ = self.unregister();
     }
+}
+
+/// What the capture hook sends back: the key that completed the chord, and the
+/// modifiers that were down at that instant.
+///
+/// A bitmask rather than a `Vec<Modifier>` because this is built inside the
+/// hook callback, which runs in the system's input path and does not allocate.
+type Chord = (u32, u8);
+
+thread_local! {
+    static CAPTURE: RefCell<Option<Sender<Chord>>> = const { RefCell::new(None) };
+}
+
+/// Wait for one chord and report it. See [`crate::capture`].
+///
+/// A second, temporary hook rather than a mode on the push-to-talk one: the two
+/// have opposite jobs — that one swallows a known key forever, this one
+/// swallows one unknown key once — and the caller has stopped the engine, so
+/// there is nothing for them to fight over.
+pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
+    let (chord_tx, chord_rx) = channel::<Chord>();
+    let (ready_tx, ready_rx) = channel::<Result<u32, String>>();
+
+    let thread = std::thread::Builder::new()
+        .name("klar-hotkey-capture".into())
+        .spawn(move || run_capture_hook(chord_tx, ready_tx))
+        .map_err(|e| PlatformError::Hotkey(e.to_string()))?;
+
+    let thread_id = match ready_rx.recv() {
+        Ok(Ok(id)) => id,
+        Ok(Err(reason)) => return Err(PlatformError::Hotkey(reason)),
+        Err(_) => {
+            return Err(PlatformError::Hotkey(
+                "the capture thread died on startup".into(),
+            ));
+        }
+    };
+
+    let outcome = chord_rx.recv_timeout(timeout);
+
+    // Whatever happened, the hook comes down before this returns. Leaving a
+    // low-level keyboard hook installed would swallow the next key pressed
+    // anywhere on the machine.
+    // SAFETY: posting a quit message to a thread id we own.
+    unsafe {
+        let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
+    }
+    if thread.join().is_err() {
+        tracing::error!("the hotkey capture thread panicked");
+    }
+
+    let (code, mask) = match outcome {
+        Ok(chord) => chord,
+        Err(RecvTimeoutError::Timeout) => return Err(BadBinding::TimedOut.into()),
+        Err(RecvTimeoutError::Disconnected) => {
+            return Err(PlatformError::Hotkey("the capture hook stopped".into()));
+        }
+    };
+
+    if code == u32::from(VK_ESCAPE.0) {
+        return Err(BadBinding::Cancelled.into());
+    }
+
+    let key = keys::key_from_virtual(code).ok_or(BadBinding::UnsupportedKey)?;
+    let binding = Binding {
+        modifiers: keys::modifiers_from_mask(mask),
+        key,
+    };
+    binding.check()?;
+
+    tracing::info!(?binding, "captured a new push-to-talk binding");
+    Ok(binding)
+}
+
+/// Body of the capture thread: install, pump until the chord or a quit, unhook.
+fn run_capture_hook(chord: Sender<Chord>, ready: Sender<Result<u32, String>>) {
+    CAPTURE.with(|slot| {
+        *slot.borrow_mut() = Some(chord);
+    });
+
+    // SAFETY: installs a global keyboard hook with a valid callback. A null
+    // module handle is correct for a hook whose procedure lives in this process.
+    let hook = match unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(capture_proc), None, 0) } {
+        Ok(hook) => hook,
+        Err(error) => {
+            let _ = ready.send(Err(format!("SetWindowsHookExW failed: {error}")));
+            return;
+        }
+    };
+
+    // SAFETY: no arguments, returns the calling thread's id.
+    let thread_id = unsafe { windows::Win32::System::Threading::GetCurrentThreadId() };
+    if ready.send(Ok(thread_id)).is_ok() {
+        pump_until_quit();
+    }
+
+    // SAFETY: same handle, released exactly once.
+    let _ = unsafe { UnhookWindowsHookEx(hook) };
+    CAPTURE.with(|slot| {
+        *slot.borrow_mut() = None;
+    });
+}
+
+/// The capture callback. Same rules as [`hook_proc`]: bounded work, no locks,
+/// no user code, no panics.
+unsafe extern "system" fn capture_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+    if code < 0 {
+        // SAFETY: forwarding the parameters we were given, unmodified.
+        return unsafe { CallNextHookEx(None, code, wparam, lparam) };
+    }
+
+    let swallow = CAPTURE.with(|slot| {
+        // `try_borrow_mut` rather than `borrow_mut`: a panic here would unwind
+        // into a Windows callback, which is undefined behaviour.
+        let Ok(slot) = slot.try_borrow_mut() else {
+            return false;
+        };
+        let Some(chord) = slot.as_ref() else {
+            return false;
+        };
+
+        if !matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN) {
+            return false;
+        }
+
+        // SAFETY: for WH_KEYBOARD_LL with code >= 0, lParam is a pointer to a
+        // KBDLLHOOKSTRUCT owned by the system for the duration of this call.
+        let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+
+        // A modifier on its own completes nothing — the user is still building
+        // the chord, and it must reach the OS so the next key sees it held.
+        if keys::is_modifier_key(event.vkCode) {
+            return false;
+        }
+
+        // Swallow whatever it was. The user is pressing this at a settings
+        // window, and an F-key or a Space arriving there would do something.
+        let _ = chord.send((event.vkCode, keys::held_mask()));
+        true
+    });
+
+    if swallow {
+        return LRESULT(1);
+    }
+
+    // SAFETY: forwarding the parameters we were given, unmodified.
+    unsafe { CallNextHookEx(None, code, wparam, lparam) }
 }
 
 /// Body of the hook thread: install, pump, unhook.

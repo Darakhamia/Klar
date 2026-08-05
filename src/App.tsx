@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ENGINE_EVENT,
+  SETTINGS_EVENT,
   appVersion,
   inShell,
   subscribe,
@@ -24,6 +25,7 @@ import {
   type ModelStatus,
   type Settings,
 } from "./lib/settings";
+import { applyAppearance } from "./lib/theme";
 import { General } from "./sections/General";
 import { Voice } from "./sections/Voice";
 import { DICTIONARY, HISTORY, Pending, STATS } from "./sections/Pending";
@@ -51,6 +53,7 @@ export function App() {
     load
       .then(([loaded, catalogue, inputs, app]) => {
         if (cancelled) return;
+        applyAppearance(loaded.appearance);
         setLocal(loaded);
         setModels(catalogue);
         setDevices(inputs);
@@ -74,9 +77,21 @@ export function App() {
     });
   }, []);
 
+  // Rust changes the settings on its own only after capturing a hotkey, and
+  // this is how the row finds out. It is a local update, not a save — the
+  // binding is already on disk by the time this arrives.
+  useEffect(() => {
+    if (!inShell()) return;
+    return subscribe<Settings>(SETTINGS_EVENT, (next) => {
+      applyAppearance(next.appearance);
+      setLocal(next);
+    });
+  }, []);
+
   // Every change is saved and applied immediately. There is no Save button:
   // nothing here is a form, and a setting that has not taken effect is a lie.
   const update = useCallback((next: Settings) => {
+    applyAppearance(next.appearance);
     setLocal(next);
     setSettings(next).catch((cause: unknown) => {
       setError(cause instanceof Error ? cause.message : String(cause));
