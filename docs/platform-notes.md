@@ -118,6 +118,13 @@ report themselves as something else:
   help — what is at its limit is MSBuild's path handling, not the filesystem.
   CUDA never hits any of this, having no nested project.
 
+  Changing generator needs the target directory wiped. `whisper-rs-sys` names
+  its build directory after the feature set, so Ninja lands on the
+  `CMakeCache.txt` MSBuild left and reports `Generator Ninja does not support
+  platform specification, but platform x64 was specified` — `x64` being the
+  cache's, from the `-Ax64` the cmake crate passes for Visual Studio and
+  correctly omits for Ninja.
+
 ---
 
 ## M6 — interface

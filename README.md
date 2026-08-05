@@ -161,7 +161,24 @@ tree, and compiles considerably faster:
 ```powershell
 winget install Ninja-build.Ninja
 $env:CMAKE_GENERATOR = "Ninja"          # the cmake crate reads this
+Remove-Item -Recurse -Force C:\kv       # see below
 ```
+
+**Wipe the target directory when you change generator.** `whisper-rs-sys` names
+its build directory after the feature set, not the generator, so Ninja arrives
+at a `CMakeCache.txt` that MSBuild left behind and fails on a platform nobody
+passed this time:
+
+```
+CMake Error at CMakeLists.txt:2 (project):
+  Generator
+    Ninja
+  does not support platform specification, but platform
+    x64
+  was specified.
+```
+
+The `x64` is the cache's, from `-Ax64` on the earlier Visual Studio run.
 
 A short `CARGO_TARGET_DIR` — `C:\kv` rather than `C:\dev\Klar\target` — buys
 about a dozen characters, which is enough for a debug build and not for a
