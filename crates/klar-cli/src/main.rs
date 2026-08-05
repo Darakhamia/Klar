@@ -152,6 +152,17 @@ struct DictateArgs {
     /// Transcribe but do not inject. For checking recognition without a target.
     #[arg(long)]
     dry: bool,
+    /// Seconds of audio before the stream may commit a phrase.
+    ///
+    /// The accuracy/latency dial. Low values cut sentences into fragments that
+    /// whisper recognises worse; high values leave the whole dictation to be
+    /// transcribed after the key comes up. Vary it and compare the reported
+    /// median against the text you actually got.
+    #[arg(long, default_value_t = 10.0)]
+    min_commit: f32,
+    /// Trailing silence that counts as the end of a phrase, in milliseconds.
+    #[arg(long, default_value_t = 700)]
+    commit_silence: u64,
 }
 
 #[derive(Subcommand)]
@@ -659,7 +670,16 @@ fn dictate(args: &DictateArgs) -> Result<()> {
         language: args.language.clone(),
         ..TranscribeOptions::default()
     };
-    let config = StreamConfig::default();
+    let config = StreamConfig {
+        min_commit: Duration::from_secs_f32(args.min_commit.max(0.5)),
+        commit_silence: Duration::from_millis(args.commit_silence),
+        ..StreamConfig::default()
+    };
+    println!(
+        "commit after {:.0}s of audio at a {} ms pause",
+        config.min_commit.as_secs_f32(),
+        config.commit_silence.as_millis()
+    );
     let mut timings = Timings::default();
 
     loop {
