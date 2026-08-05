@@ -18,9 +18,9 @@
 use super::keys;
 use crate::{BadBinding, Binding, Hotkey, HotkeyEvent, PlatformError};
 use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use std::sync::mpsc::{RecvTimeoutError, Sender, channel};
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, Ordering};
+use std::sync::mpsc::{Sender, channel};
+use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
 use windows::Win32::UI::WindowsAndMessaging::{
@@ -135,39 +135,46 @@ impl Drop for WindowsHotkey {
     }
 }
 
-/// What the capture hook sends back: the key that completed the chord, and the
-/// modifiers that were down at that instant.
+/// Set while a chord is being captured. Read by every hook this process has
+/// installed.
 ///
-/// A bitmask rather than a `Vec<Modifier>` because this is built inside the
-/// hook callback, which runs in the system's input path and does not allocate.
-type Chord = (u32, u8);
-
-thread_local! {
-    static CAPTURE: RefCell<Option<Sender<Chord>>> = const { RefCell::new(None) };
-}
-
-/// Set while a chord is being captured, read by the push-to-talk hook.
+/// Capture does not depend on being the hook that receives the key. A hook of
+/// its own is installed — which is all there is in `klar-cli` — but the
+/// push-to-talk hook captures too when this is set, and inside the app that is
+/// the one demonstrably being handed keystrokes. Whichever the system reaches
+/// first records the chord; the other finds it already taken.
 ///
-/// The two hooks are installed at once and Windows calls the most recently
-/// installed first, which should mean the capture hook always gets the key
-/// before the push-to-talk one is offered it. This does not rely on that: while
-/// a capture is running the push-to-talk hook stands down completely, so it
-/// cannot swallow a key or start a dictation whichever order they are called
-/// in.
+/// This is deliberately belt and braces. A capture-only hook installed by the
+/// app never received a single callback, while the identical hook in the CLI
+/// received every keystroke, and I never found out why. Riding the hook that
+/// works makes the answer unnecessary rather than merely unknown.
 static CAPTURING: AtomicBool = AtomicBool::new(false);
 
-/// Key events the capture hook was handed, whether or not they completed a
-/// chord. Zero after a capture that timed out means the callback was never
-/// called at all — a different problem from one where the filtering is wrong,
-/// and not something the outcome alone distinguishes.
+/// The chord, once a hook has seen one. Plain atomics because they are written
+/// from inside a hook callback, which runs in the system's input path and must
+/// not allocate or take a lock.
+static CAPTURED: AtomicBool = AtomicBool::new(false);
+static CAPTURED_KEY: AtomicU32 = AtomicU32::new(0);
+static CAPTURED_MODIFIERS: AtomicU8 = AtomicU8::new(0);
+
+/// Key events handed to a hook while capturing, whether or not they completed a
+/// chord. Zero after a capture that timed out means no callback was called at
+/// all — a dead hook rather than a fussy filter, which the outcome alone cannot
+/// distinguish.
 static SEEN: AtomicU32 = AtomicU32::new(0);
 
-/// Turns [`CAPTURING`] off however the capture ends, including early returns.
+/// How often the waiting thread looks at [`CAPTURED`]. Fine for something a
+/// person is about to do with their hand.
+const POLL: Duration = Duration::from_millis(10);
+
+/// Clears the capture state on the way in and turns it off however the capture
+/// ends, including the early returns.
 struct CaptureGuard;
 
 impl CaptureGuard {
     fn begin() -> Self {
         SEEN.store(0, Ordering::SeqCst);
+        CAPTURED.store(false, Ordering::SeqCst);
         CAPTURING.store(true, Ordering::SeqCst);
         Self
     }
@@ -179,59 +186,76 @@ impl Drop for CaptureGuard {
     }
 }
 
+/// Handle one key event on behalf of a capture. Returns whether to swallow it.
+///
+/// Called from both hook callbacks, so it obeys their rules: bounded work, no
+/// allocation, no locks, no panics.
+fn record(wparam: WPARAM, lparam: LPARAM) -> bool {
+    SEEN.fetch_add(1, Ordering::Relaxed);
+
+    if !matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN) {
+        return false;
+    }
+
+    // SAFETY: for WH_KEYBOARD_LL with code >= 0, lParam is a pointer to a
+    // KBDLLHOOKSTRUCT owned by the system for the duration of this call.
+    let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
+
+    // A modifier on its own completes nothing — the user is still building the
+    // chord, and it must reach the OS so the next key sees it held.
+    if keys::is_modifier_key(event.vkCode) {
+        return false;
+    }
+
+    if !CAPTURED.load(Ordering::SeqCst) {
+        CAPTURED_KEY.store(event.vkCode, Ordering::SeqCst);
+        CAPTURED_MODIFIERS.store(keys::held_mask(), Ordering::SeqCst);
+        // Last, so the waiting thread never reads a half-written chord.
+        CAPTURED.store(true, Ordering::SeqCst);
+    }
+
+    // Swallow it. The user is pressing this at a settings window, where an
+    // F-key or a Space would otherwise do something.
+    true
+}
+
 /// Wait for one chord and report it. See [`crate::capture`].
 ///
-/// A second, temporary hook rather than a mode on the push-to-talk one: the two
-/// have opposite jobs — that one swallows a known key forever, this one
-/// swallows one unknown key once — and the caller has stopped the engine, so
-/// there is nothing for them to fight over.
+/// Waits on a flag rather than on a channel from one particular hook, because
+/// which hook delivers the key is exactly what could not be relied on: see
+/// [`CAPTURING`].
 pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     let _capturing = CaptureGuard::begin();
-    let (chord_tx, chord_rx) = channel::<Chord>();
-    let (ready_tx, ready_rx) = channel::<Result<u32, String>>();
 
-    let thread = std::thread::Builder::new()
-        .name("klar-hotkey-capture".into())
-        .spawn(move || run_capture_hook(chord_tx, ready_tx))
-        .map_err(|e| PlatformError::Hotkey(e.to_string()))?;
-
-    let thread_id = match ready_rx.recv() {
-        Ok(Ok(id)) => id,
-        Ok(Err(reason)) => return Err(PlatformError::Hotkey(reason)),
-        Err(_) => {
-            return Err(PlatformError::Hotkey(
-                "the capture thread died on startup".into(),
-            ));
+    // A hook of our own, so capture works when nothing else in this process is
+    // hooked — `klar-cli`, and the app before its engine has loaded. When the
+    // push-to-talk hook is running it captures too, and inside the app that is
+    // the one that actually gets the keystrokes.
+    let own = TemporaryHook::install();
+    match &own {
+        Ok(_) => tracing::info!(?timeout, "capture armed; waiting for a chord"),
+        // Not fatal on its own: the push-to-talk hook may still deliver. Said
+        // out loud, because if nothing else is hooked this capture is doomed.
+        Err(error) => {
+            tracing::warn!(%error, "no capture hook of our own; relying on the push-to-talk hook")
         }
-    };
-
-    tracing::info!(?timeout, "capture hook installed; waiting for a chord");
-    let outcome = chord_rx.recv_timeout(timeout);
-
-    // Whatever happened, the hook comes down before this returns. Leaving a
-    // low-level keyboard hook installed would swallow the next key pressed
-    // anywhere on the machine.
-    // SAFETY: posting a quit message to a thread id we own.
-    unsafe {
-        let _ = PostThreadMessageW(thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
-    }
-    if thread.join().is_err() {
-        tracing::error!("the hotkey capture thread panicked");
     }
 
-    let seen = SEEN.load(Ordering::SeqCst);
-    let (code, mask) = match outcome {
-        Ok(chord) => chord,
-        Err(RecvTimeoutError::Timeout) => {
-            // `seen` is the whole diagnosis here: zero means the callback was
-            // never called, which is a dead hook rather than a fussy filter.
-            tracing::warn!(seen, "capture timed out; key events the hook was handed");
+    let deadline = Instant::now() + timeout;
+    while !CAPTURED.load(Ordering::SeqCst) {
+        if Instant::now() >= deadline {
+            tracing::warn!(
+                seen = SEEN.load(Ordering::SeqCst),
+                "capture timed out; key events the hooks were handed"
+            );
             return Err(BadBinding::TimedOut.into());
         }
-        Err(RecvTimeoutError::Disconnected) => {
-            return Err(PlatformError::Hotkey("the capture hook stopped".into()));
-        }
-    };
+        std::thread::sleep(POLL);
+    }
+
+    let code = CAPTURED_KEY.load(Ordering::SeqCst);
+    let mask = CAPTURED_MODIFIERS.load(Ordering::SeqCst);
+    let seen = SEEN.load(Ordering::SeqCst);
 
     if code == u32::from(VK_ESCAPE.0) {
         return Err(BadBinding::Cancelled.into());
@@ -249,12 +273,54 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     Ok(binding)
 }
 
-/// Body of the capture thread: install, pump until the chord or a quit, unhook.
-fn run_capture_hook(chord: Sender<Chord>, ready: Sender<Result<u32, String>>) {
-    CAPTURE.with(|slot| {
-        *slot.borrow_mut() = Some(chord);
-    });
+/// A keyboard hook that lives for one capture and comes down with it.
+///
+/// Leaving a low-level keyboard hook installed would swallow the next key
+/// pressed anywhere on the machine, so this is a guard rather than a pair of
+/// calls somebody has to remember to balance.
+struct TemporaryHook {
+    thread_id: u32,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
 
+impl TemporaryHook {
+    fn install() -> Result<Self, PlatformError> {
+        let (ready_tx, ready_rx) = channel::<Result<u32, String>>();
+
+        let thread = std::thread::Builder::new()
+            .name("klar-hotkey-capture".into())
+            .spawn(move || run_capture_hook(&ready_tx))
+            .map_err(|e| PlatformError::Hotkey(e.to_string()))?;
+
+        match ready_rx.recv() {
+            Ok(Ok(thread_id)) => Ok(Self {
+                thread_id,
+                thread: Some(thread),
+            }),
+            Ok(Err(reason)) => Err(PlatformError::Hotkey(reason)),
+            Err(_) => Err(PlatformError::Hotkey(
+                "the capture thread died on startup".into(),
+            )),
+        }
+    }
+}
+
+impl Drop for TemporaryHook {
+    fn drop(&mut self) {
+        // SAFETY: posting a quit message to a thread id we own.
+        unsafe {
+            let _ = PostThreadMessageW(self.thread_id, WM_QUIT, WPARAM(0), LPARAM(0));
+        }
+        if let Some(thread) = self.thread.take()
+            && thread.join().is_err()
+        {
+            tracing::error!("the hotkey capture thread panicked");
+        }
+    }
+}
+
+/// Body of the capture thread: install, pump until told to quit, unhook.
+fn run_capture_hook(ready: &Sender<Result<u32, String>>) {
     // SAFETY: installs a global keyboard hook with a valid callback. A null
     // module handle is correct for a hook whose procedure lives in this process.
     let hook = match unsafe { SetWindowsHookExW(WH_KEYBOARD_LL, Some(capture_proc), None, 0) } {
@@ -273,54 +339,12 @@ fn run_capture_hook(chord: Sender<Chord>, ready: Sender<Result<u32, String>>) {
 
     // SAFETY: same handle, released exactly once.
     let _ = unsafe { UnhookWindowsHookEx(hook) };
-    CAPTURE.with(|slot| {
-        *slot.borrow_mut() = None;
-    });
 }
 
 /// The capture callback. Same rules as [`hook_proc`]: bounded work, no locks,
 /// no user code, no panics.
 unsafe extern "system" fn capture_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-    if code < 0 {
-        // SAFETY: forwarding the parameters we were given, unmodified.
-        return unsafe { CallNextHookEx(None, code, wparam, lparam) };
-    }
-
-    // Counted before any filtering, so a capture that found nothing can still
-    // say whether it was ever called.
-    SEEN.fetch_add(1, Ordering::Relaxed);
-
-    let swallow = CAPTURE.with(|slot| {
-        // `try_borrow_mut` rather than `borrow_mut`: a panic here would unwind
-        // into a Windows callback, which is undefined behaviour.
-        let Ok(slot) = slot.try_borrow_mut() else {
-            return false;
-        };
-        let Some(chord) = slot.as_ref() else {
-            return false;
-        };
-
-        if !matches!(wparam.0 as u32, WM_KEYDOWN | WM_SYSKEYDOWN) {
-            return false;
-        }
-
-        // SAFETY: for WH_KEYBOARD_LL with code >= 0, lParam is a pointer to a
-        // KBDLLHOOKSTRUCT owned by the system for the duration of this call.
-        let event = unsafe { &*(lparam.0 as *const KBDLLHOOKSTRUCT) };
-
-        // A modifier on its own completes nothing — the user is still building
-        // the chord, and it must reach the OS so the next key sees it held.
-        if keys::is_modifier_key(event.vkCode) {
-            return false;
-        }
-
-        // Swallow whatever it was. The user is pressing this at a settings
-        // window, and an F-key or a Space arriving there would do something.
-        let _ = chord.send((event.vkCode, keys::held_mask()));
-        true
-    });
-
-    if swallow {
+    if code >= 0 && CAPTURING.load(Ordering::Relaxed) && record(wparam, lparam) {
         return LRESULT(1);
     }
 
@@ -396,10 +420,13 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         return unsafe { CallNextHookEx(None, code, wparam, lparam) };
     }
 
-    // A capture is running. Stand down completely rather than trust that the
-    // capture hook is called first: whichever order Windows uses, only one of
-    // the two acts on the key.
+    // A capture is running. This hook takes it rather than standing aside: in
+    // the app it is the one being handed keystrokes, and push-to-talk has
+    // nothing to do while the user is choosing a new binding.
     if CAPTURING.load(Ordering::Relaxed) {
+        if record(wparam, lparam) {
+            return LRESULT(1);
+        }
         // SAFETY: forwarding the parameters we were given, unmodified.
         return unsafe { CallNextHookEx(None, code, wparam, lparam) };
     }

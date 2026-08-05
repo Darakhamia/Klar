@@ -110,12 +110,34 @@ is: a key that types a character needs a modifier, because bound bare the hook
 would swallow every one the user typed. A key that types nothing — a function
 key, Insert, an arrow — may be bound alone.
 
-The diagnostic that made the difference stays in. The capture hook counts every
-event it is handed before any filtering, and a timeout logs the count: zero is a
-dead hook, non-zero with no chord is a filter that is too strict. So is the
-push-to-talk hook standing down while `CAPTURING` is set — it was not the
-problem, but it removes an ordering assumption that would otherwise still be
-load-bearing.
+### A capture hook that fires in the CLI and never fires in the app
+
+Unexplained, and now routed around rather than solved.
+
+The facts: a `WH_KEYBOARD_LL` hook installed by `capture_binding` receives every
+keystroke when `klar-cli` installs it — including with a push-to-talk hook
+already running in the same process, which is the case that looked most
+suspicious and turned out fine. The same code in the app receives nothing:
+`SetWindowsHookExW` succeeds, the thread pumps, and the callback is not called
+once. `seen=0`, twice in a row, while the user was pressing keys.
+
+The push-to-talk hook in that same process is being handed those keystrokes
+perfectly well — dictation works. So capture stopped insisting on being the hook
+that receives the key. `CAPTURING` is a process-wide flag; every hook Klar has
+installed records into the same three atomics while it is set, and
+`capture_binding` waits on those rather than on a channel from one particular
+hook. Its own temporary hook is still installed, because in `klar-cli` there is
+nothing else to ride.
+
+This is a workaround for something I do not understand, which is worth saying
+plainly. What it costs is one atomic load per keystroke in a callback that
+already reads `GetAsyncKeyState`. What it buys is that the mechanism no longer
+depends on the thing that was failing.
+
+The diagnostic that got us here stays in: every hook counts the events it is
+handed while capturing, before any filtering, and a timeout logs the count. Zero
+is a dead hook, non-zero with no chord is a filter that is too strict, and it
+took four rounds of guessing to earn that distinction.
 
 ### `listen` is ACL-gated per window, and a refusal is silent
 
