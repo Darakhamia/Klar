@@ -8,6 +8,7 @@ use clap::{Parser, Subcommand};
 use klar_core::asr::{Backend, TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
+use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
 use klar_core::stream::{Stream, StreamConfig, StreamStats, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine};
@@ -50,6 +51,8 @@ enum Command {
     Dictate(DictateArgs),
     /// Show what the voice activity detector finds in a wav file.
     Vad(VadArgs),
+    /// Clean up a line of text through the local model, and time it.
+    Polish(PolishArgs),
     /// Manage the whisper models.
     #[command(subcommand)]
     Model(ModelCommand),
@@ -109,6 +112,42 @@ struct VadArgs {
     /// file through in chunks, and compare the two.
     #[arg(long)]
     stream: bool,
+}
+
+#[derive(clap::Args)]
+struct PolishArgs {
+    /// What the speaker said, as whisper would hand it over.
+    text: String,
+    /// verbatim (off), light, balanced or heavy.
+    #[arg(long, default_value = "balanced")]
+    strength: StrengthArg,
+    /// A model this Ollama has pulled. `--strength verbatim` needs none.
+    #[arg(long, default_value = "")]
+    model: String,
+    #[arg(long, default_value = klar_core::polish::ollama::DEFAULT_ENDPOINT)]
+    endpoint: String,
+    /// How long the model gets before the transcript is used instead.
+    #[arg(long, default_value_t = 400)]
+    budget_ms: u64,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum StrengthArg {
+    Verbatim,
+    Light,
+    Balanced,
+    Heavy,
+}
+
+impl From<StrengthArg> for Strength {
+    fn from(strength: StrengthArg) -> Self {
+        match strength {
+            StrengthArg::Verbatim => Self::Verbatim,
+            StrengthArg::Light => Self::Light,
+            StrengthArg::Balanced => Self::Balanced,
+            StrengthArg::Heavy => Self::Heavy,
+        }
+    }
 }
 
 #[derive(clap::Args)]
@@ -207,6 +246,7 @@ async fn main() -> Result<()> {
         Command::Transcribe(args) => transcribe(&args),
         Command::Listen(args) => listen(&args),
         Command::Vad(args) => vad(&args),
+        Command::Polish(args) => polish(&args).await,
         Command::Inject(args) => inject(&args),
         Command::Hotkey => hotkey(),
         Command::Dictate(args) => dictate(&args),
@@ -586,6 +626,55 @@ fn inject(args: &InjectArgs) -> Result<()> {
     println!(
         "injected via {used:?} in {} ms",
         started.elapsed().as_millis()
+    );
+    Ok(())
+}
+
+/// Run one line of text through the polish stage and print what came back.
+///
+/// The fastest way to see what a prompt does to a real dictation, and the only
+/// way to measure the stage against its 400 ms budget without speaking.
+async fn polish(args: &PolishArgs) -> Result<()> {
+    let strength = Strength::from(args.strength);
+
+    if strength == Strength::Verbatim {
+        println!("verbatim — the polish stage is off, nothing was sent anywhere");
+        println!("{}", args.text);
+        return Ok(());
+    }
+    if args.model.is_empty() {
+        bail!("--model is required unless --strength verbatim; try `ollama list`");
+    }
+
+    let budget = Duration::from_millis(args.budget_ms);
+    let mut ollama = Ollama::new(OllamaConfig {
+        endpoint: args.endpoint.clone(),
+        model: args.model.clone(),
+        budget,
+    })?;
+
+    let started = Instant::now();
+    let polished = ollama
+        .polish(PolishRequest {
+            text: &args.text,
+            strength,
+            vocabulary: &[],
+        })
+        .await;
+    let took = started.elapsed();
+
+    println!("said   {}", args.text);
+    match polished {
+        Ok(text) => println!("typed  {text}"),
+        // Not an error to the shell: a refusal is the guard doing its job, and
+        // the interesting part is what the model actually said.
+        Err(error) => println!("failed {error}"),
+    }
+    println!(
+        "\n{} ms against the {} ms budget, model {}",
+        took.as_millis(),
+        budget.as_millis(),
+        args.model
     );
     Ok(())
 }

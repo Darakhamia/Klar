@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 import { Row, Segmented, Select } from "../components/Row";
 import type { Cleanup, Device, ModelStatus, Processing, Settings } from "../lib/settings";
-import { LANGUAGES } from "../lib/settings";
+import { LANGUAGES, polishStatus, type PolishStatus } from "../lib/settings";
 
 /** The example from the design, showing what each cleanup strength does. */
 const SAID =
@@ -112,6 +113,8 @@ export function Voice({
         />
       </Row>
 
+      {settings.cleanup !== "verbatim" && <PolishModel settings={settings} onChange={onChange} />}
+
       <div className="example">
         <div className="example__row">
           <div className="label">Said</div>
@@ -122,8 +125,8 @@ export function Voice({
           <p className="example__typed">{TYPED[settings.cleanup]}</p>
         </div>
         <p className="example__note">
-          An illustration. The polish stage arrives in the next milestone; until then Klar inserts
-          the transcript as recognised.
+          An illustration of each setting, not a recorded result. What a model actually returns
+          depends on which one you point Klar at.
         </p>
       </div>
     </>
@@ -140,5 +143,78 @@ function Meter({ level }: { level: number }) {
         <span key={index} className="meter__cell" data-on={index < filled ? "true" : "false"} />
       ))}
     </div>
+  );
+}
+
+/**
+ * Which local model does the polishing.
+ *
+ * No default name is offered. What a machine has pulled is what works, the
+ * useful sizes change every few months, and naming one here would send somebody
+ * after a download that may be the wrong one. So the list is whatever Ollama
+ * reports, and when it reports nothing the row says why rather than showing an
+ * empty menu.
+ */
+function PolishModel({
+  settings,
+  onChange,
+}: {
+  settings: Settings;
+  onChange: (next: Settings) => void;
+}) {
+  const [status, setStatus] = useState<PolishStatus | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    polishStatus()
+      .then((reported) => {
+        if (!cancelled) setStatus(reported);
+      })
+      .catch(() => {
+        if (!cancelled)
+          setStatus({ reachable: false, endpoint: settings.polishEndpoint, models: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.polishEndpoint]);
+
+  if (status === null) {
+    return <Row label="Polish model" hint="Asking the local model server…" children={null} />;
+  }
+
+  if (!status.reachable) {
+    return (
+      <Row
+        label="Polish model"
+        hint={`Nothing is answering at ${status.endpoint}. Install Ollama and pull a model — until then dictation still works and the transcript goes in as recognised.`}
+        alert
+      >
+        <span className="figure">Off</span>
+      </Row>
+    );
+  }
+
+  return (
+    <Row
+      label="Polish model"
+      hint={
+        settings.polishModel
+          ? "Runs on this machine. Nothing is sent anywhere."
+          : "Pick one to switch the polish stage on."
+      }
+      alert={!settings.polishModel}
+    >
+      <Select
+        value={settings.polishModel}
+        options={[
+          { value: "", label: "None — insert as recognised" },
+          ...status.models.map((model) => ({ value: model, label: model })),
+        ]}
+        onChange={(polishModel) => {
+          onChange({ ...settings, polishModel });
+        }}
+      />
+    </Row>
   );
 }

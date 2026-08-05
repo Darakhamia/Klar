@@ -12,6 +12,7 @@
 pub mod asr;
 pub mod audio;
 pub mod model;
+pub mod polish;
 pub mod state;
 pub mod stream;
 pub mod vad;

@@ -24,6 +24,8 @@ export interface Settings {
   model: string;
   microphone: string | null;
   cleanup: Cleanup;
+  polishEndpoint: string;
+  polishModel: string;
   appearance: Appearance;
   onboarded: boolean;
 }
@@ -53,6 +55,16 @@ export const setSettings = (settings: Settings): Promise<void> =>
 export const listModels = (): Promise<ModelStatus[]> => invoke<ModelStatus[]>("models");
 
 export const listDevices = (): Promise<Device[]> => invoke<Device[]>("audio_devices");
+
+/** What the local model server has, if it is running. `models` is empty when it
+ * is not, which is the same answer either way: nothing to choose from. */
+export interface PolishStatus {
+  reachable: boolean;
+  endpoint: string;
+  models: string[];
+}
+
+export const polishStatus = (): Promise<PolishStatus> => invoke<PolishStatus>("polish_status");
 
 /** The languages worth offering. Whisper knows a hundred; nobody needs a
  * hundred-item menu, and `null` covers everything else by detecting. */

@@ -60,6 +60,18 @@ Verbatim is not a gentle prompt — it is off. The polisher is never constructed
 
 **Done when:** the fixture set passes, and polish adds under 400 ms on the local path.
 
+Built. `Noop` and `Ollama` are wired up behind `TextPolisher`; `Groq` is not, and
+waits until there is a reason to send anything off the machine. The prompts are
+files under `crates/klar-core/prompts/polish/v1/`. Two things were learned
+building it and are worth keeping in mind for the cloud path:
+
+- The failure that matters is a model answering the dictation instead of tidying
+  it, and no prompt prevents it reliably. `polish::guard` compares lengths and
+  throws the result away when it is out of range — crude, and it catches the
+  case, because an answer misses by a mile rather than by a word.
+- Every failure falls back to the transcript. A model that is down, slow, or
+  answering must not cost the user the words they just said.
+
 ---
 
 ## M5 — Storage

@@ -8,6 +8,7 @@
 use crate::settings::FinishAction;
 use klar_core::asr::{TranscribeOptions, WhisperTranscriber};
 use klar_core::audio::{self, BlockConverter, Capture, CaptureConfig};
+use klar_core::polish::{OllamaConfig, PolishRequest, Polisher, Strength, TextPolisher};
 use klar_core::stream::{Stream, StreamConfig, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine, State, StateEvent, model};
@@ -51,6 +52,9 @@ pub struct EngineConfig {
     pub device: Option<String>,
     pub hotkey: Binding,
     pub finish: FinishAction,
+    pub cleanup: Strength,
+    /// `None` leaves the transcript alone — see `Settings::polish`.
+    pub polish: Option<OllamaConfig>,
     pub stream: StreamConfig,
 }
 
@@ -62,6 +66,8 @@ impl Default for EngineConfig {
             device: None,
             hotkey: klar_platform::default_binding(),
             finish: FinishAction::default(),
+            cleanup: Strength::default(),
+            polish: None,
             stream: StreamConfig::default(),
         }
     }
@@ -75,6 +81,8 @@ impl From<&crate::settings::Settings> for EngineConfig {
             device: settings.microphone.clone(),
             hotkey: settings.hotkey.clone(),
             finish: settings.on_finish,
+            cleanup: settings.cleanup,
+            polish: settings.polish(),
             stream: StreamConfig::default(),
         }
     }
@@ -181,6 +189,25 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
         StreamingVad::new(Vad::load(&vad_path, VadSettings::default()).map_err(|e| e.to_string())?);
     let mut injector = klar_platform::injector();
 
+    // The polish stage is HTTP, and the rest of this thread is not. One
+    // current-thread runtime, built here and used for nothing else, keeps the
+    // async confined to the one call that needs it — and this thread is not
+    // inside a runtime, so blocking on it cannot nest.
+    let mut polisher = match &config.polish {
+        Some(ollama) => match klar_core::polish::Ollama::new(ollama.clone()) {
+            Ok(ollama) => Polisher::Ollama(ollama),
+            Err(error) => {
+                tracing::warn!(%error, "polish is configured but unusable; dictating plain");
+                Polisher::Noop
+            }
+        },
+        None => Polisher::Noop,
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("could not start the polish runtime: {error}"))?;
+
     let binding = config.hotkey.clone();
     let (hotkey_tx, hotkey_rx) = channel();
     let mut hotkey = klar_platform::hotkey();
@@ -215,6 +242,8 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
                     &options,
                     &mut transcriber,
                     &mut vad,
+                    &mut polisher,
+                    &runtime,
                     &mut *injector,
                     &hotkey_rx,
                     stop,
@@ -248,6 +277,8 @@ fn dictate(
     options: &TranscribeOptions,
     transcriber: &mut WhisperTranscriber,
     vad: &mut StreamingVad,
+    polisher: &mut Polisher,
+    runtime: &tokio::runtime::Runtime,
     injector: &mut dyn klar_platform::TextInjector,
     hotkey_rx: &Receiver<HotkeyEvent>,
     stop: &AtomicBool,
@@ -339,21 +370,66 @@ fn dictate(
         },
     );
 
-    // M4 puts the polish stage here. Until then the transcript goes straight
-    // through, and the state machine passes through Polishing untouched.
-    apply(app, &mut machine, Input::Polished(text.clone()));
+    let started_polish = Instant::now();
+    let polished = polish(runtime, polisher, &text, config.cleanup);
+    let polish_ms = started_polish.elapsed().as_millis() as u64;
 
-    let delivered = deliver(&text, config.finish, injector).map_err(|e| e.to_string())?;
+    apply(app, &mut machine, Input::Polished(polished.clone()));
+    if polished != text {
+        emit(
+            app,
+            UiEvent::Text {
+                text: polished.clone(),
+                settled: true,
+            },
+        );
+    }
+
+    let delivered = deliver(&polished, config.finish, injector).map_err(|e| e.to_string())?;
 
     tracing::info!(
         method = ?delivered,
         finish = ?config.finish,
+        cleanup = ?config.cleanup,
         commits = stats.commits,
         tail_ms = stats.tail_elapsed.as_millis() as u64,
+        polish_ms,
         "dictation delivered"
     );
     apply(app, &mut machine, Input::Injected);
     Ok(())
+}
+
+/// Run the polish stage, or hand the transcript back unchanged.
+///
+/// Every failure here returns the transcript. A model that is down, slow, or
+/// answering instead of editing must not cost the user the words they just
+/// said — plain text now beats polished text never, and the log says which
+/// happened.
+fn polish(
+    runtime: &tokio::runtime::Runtime,
+    polisher: &mut Polisher,
+    text: &str,
+    cleanup: Strength,
+) -> String {
+    if cleanup == Strength::Verbatim || matches!(polisher, Polisher::Noop) {
+        return text.to_owned();
+    }
+
+    let request = PolishRequest {
+        text,
+        strength: cleanup,
+        // M5's dictionary fills this in.
+        vocabulary: &[],
+    };
+
+    match runtime.block_on(polisher.polish(request)) {
+        Ok(polished) => polished,
+        Err(error) => {
+            tracing::warn!(%error, "polish failed; inserting the transcript as recognised");
+            text.to_owned()
+        }
+    }
 }
 
 /// Put the finished text wherever the user asked for it.

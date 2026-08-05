@@ -4,6 +4,7 @@
 //! is a dozen fields read once at startup, and the database in M5 is for
 //! dictations, the dictionary and statistics — things there are thousands of.
 
+use klar_core::polish::{OllamaConfig, Strength};
 use klar_platform::Binding;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -50,18 +51,6 @@ pub enum Processing {
     Cloud,
 }
 
-/// How much the polish stage is allowed to rewrite. Wired up in M4; stored now
-/// so the setting survives the milestone that gives it meaning.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub enum Cleanup {
-    Verbatim,
-    Light,
-    #[default]
-    Balanced,
-    Heavy,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -76,7 +65,15 @@ pub struct Settings {
     pub model: String,
     /// Device name, or `None` for the system default.
     pub microphone: Option<String>,
-    pub cleanup: Cleanup,
+    pub cleanup: Strength,
+    /// Where the local model server is, and which of its models to use.
+    ///
+    /// An empty model name is the honest default: whatever a machine has pulled
+    /// is what works, and guessing a name would send a first-time user after a
+    /// download that may be the wrong one. Until it is set, polish stays off
+    /// whatever the cleanup strength says.
+    pub polish_endpoint: String,
+    pub polish_model: String,
     pub appearance: Appearance,
     /// Whether first-run setup has been completed. False on a fresh install and
     /// on an install that predates onboarding — running through it again costs
@@ -95,7 +92,9 @@ impl Default for Settings {
             processing: Processing::default(),
             model: klar_core::model::DEFAULT_MODEL.to_owned(),
             microphone: None,
-            cleanup: Cleanup::default(),
+            cleanup: Strength::default(),
+            polish_endpoint: klar_core::polish::ollama::DEFAULT_ENDPOINT.to_owned(),
+            polish_model: String::new(),
             appearance: Appearance::default(),
             onboarded: false,
         }
@@ -125,6 +124,24 @@ impl Settings {
                 Self::default()
             }
         }
+    }
+
+    /// What the polish stage should be, given what the user chose and what is
+    /// actually configured.
+    ///
+    /// `None` means the transcript goes straight through. That is what verbatim
+    /// asks for, and also what an unset model has to mean: an endpoint with
+    /// nothing behind it would fail on every dictation, and failing quietly to
+    /// plain text beats failing loudly at the moment somebody speaks.
+    pub fn polish(&self) -> Option<OllamaConfig> {
+        if self.cleanup == Strength::Verbatim || self.polish_model.is_empty() {
+            return None;
+        }
+        Some(OllamaConfig {
+            endpoint: self.polish_endpoint.clone(),
+            model: self.polish_model.clone(),
+            ..OllamaConfig::default()
+        })
     }
 
     /// Write to disk, through a temporary file so an interrupted save cannot

@@ -105,6 +105,30 @@ cargo run -p klar-cli --features cuda -- listen --seconds 5
 `doctor` prints the backend and `listen` prints the real-time factor, so a
 build that quietly fell back to CPU is visible immediately rather than at M3.
 
+### Polishing
+
+The stage that makes Klar not a transcriber. It runs against a model on your own
+machine through [Ollama](https://ollama.com), and it is off until you point it at
+one — dictation works without it and inserts the transcript as recognised.
+
+```sh
+ollama pull llama3.2:3b     # or whatever size this machine can answer with fast
+cargo run -p klar-cli -- polish "so I guess we should um push the review to \
+  Thursday no Friday" --model llama3.2:3b
+```
+
+It prints what went in, what came back, and how long against the 400 ms budget.
+`--strength verbatim` sends nothing anywhere; `light`, `balanced` and `heavy` use
+the prompts in `crates/klar-core/prompts/polish/v1/`.
+
+The fixture set checks that a model cleans a dictation rather than answering it:
+
+```sh
+KLAR_OLLAMA_MODEL=llama3.2:3b cargo test -p klar-core --test polish_fixtures
+```
+
+Without that variable it skips, because CI has no model server.
+
 ### Hold to talk
 
 ```sh

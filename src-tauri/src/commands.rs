@@ -172,6 +172,46 @@ pub fn models() -> Result<Vec<ModelStatus>, String> {
         .collect())
 }
 
+/// What the local model server has, if it is running.
+///
+/// `models` is empty when it is not, which is the same answer the settings
+/// window needs either way: there is nothing to choose from.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PolishStatus {
+    reachable: bool,
+    endpoint: String,
+    models: Vec<String>,
+}
+
+#[tauri::command]
+pub async fn polish_status() -> PolishStatus {
+    let settings = Settings::load();
+    let endpoint = settings.polish_endpoint.clone();
+
+    let config = klar_core::polish::OllamaConfig {
+        endpoint: endpoint.clone(),
+        model: settings.polish_model.clone(),
+        // Only a listing; the dictation budget has nothing to do with it, and a
+        // server that is starting up deserves longer than 400 ms to say hello.
+        budget: std::time::Duration::from_secs(3),
+    };
+
+    let models = match klar_core::polish::Ollama::new(config) {
+        Ok(ollama) => ollama.models().await.unwrap_or_default(),
+        Err(error) => {
+            tracing::warn!(%error, "could not build the polish client");
+            Vec::new()
+        }
+    };
+
+    PolishStatus {
+        reachable: !models.is_empty(),
+        endpoint,
+        models,
+    }
+}
+
 /// What the OS currently says about each permission onboarding walks through.
 #[tauri::command]
 pub fn permission_states() -> Vec<PermissionReport> {

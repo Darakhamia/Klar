@@ -38,6 +38,7 @@ pub fn run() {
             commands::permission_states,
             commands::audio_devices,
             commands::models,
+            commands::polish_status,
             commands::settings_get,
             commands::settings_set,
             commands::engine_restart,
