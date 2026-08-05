@@ -13,11 +13,15 @@ and [`docs/BUILD-PLAN.md`](docs/BUILD-PLAN.md) for the milestones.
 
 ## Status
 
-**M6 in progress — the app.** Tray icon, a dictation engine running the M1-M3
-pipeline in the background, the overlay from the design (direction A,
-"Collapse"), and the settings window: General and Voice are live and take
-effect immediately; Dictionary, History and Stats are waiting on the database
-in M5 and say so rather than showing invented rows. Onboarding is next.
+**Usable.** Hold the hotkey, speak, release, text appears. Rebinding, start with
+Windows, where the finished text goes, light and dark, overlay position, and
+onboarding all work. The polish stage is built and **off by default** — it needs
+a local model server, and dictation without it inserts the transcript as
+recognised.
+
+Not built: the dictionary, history and statistics, which need the database in
+M5, and the cloud path for machines without a usable GPU. Both say so in the
+interface rather than being offered and doing nothing.
 
 **M3 passed on Windows.** Transcription runs during speech and commits at
 pauses, so key release leaves only the tail: median 260 ms from key-up to
@@ -155,6 +159,28 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 npm run lint
 ```
+
+## Building an installer
+
+```powershell
+npm install
+npm run tauri build -- --features cuda
+```
+
+The installer lands in `src-tauri/target/release/bundle/nsis/`. It installs for
+the current user only, so it needs no administrator.
+
+Two things this build is not yet, both of them M7's job:
+
+- **It is unsigned.** SmartScreen will warn on first run — "More info" then "Run
+  anyway". Code signing is what removes that, and it needs a certificate.
+- **It expects the CUDA runtime on the machine.** whisper.cpp links the CUDA
+  DLLs dynamically, so a machine without the CUDA Toolkit gets a missing-DLL
+  error before Klar starts. Fine on the machine that built it; not yet something
+  to hand to somebody else.
+
+`--features cuda` matters. Without it the build works, runs on the CPU, and
+misses the latency budget by an order of magnitude.
 
 ## Licence
 

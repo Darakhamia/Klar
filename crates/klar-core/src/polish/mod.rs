@@ -31,9 +31,13 @@ use std::time::Duration;
 pub enum Strength {
     /// Off. No model is called and no text leaves this machine — see
     /// [`Strength::prompt`].
+    ///
+    /// The default, because a fresh install has no model server and no model,
+    /// and a default that quietly does nothing is worse than one that says it
+    /// is off. Turning it on is a deliberate act with a visible setting.
+    #[default]
     Verbatim,
     Light,
-    #[default]
     Balanced,
     Heavy,
 }

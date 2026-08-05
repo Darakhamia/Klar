@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Row, Segmented, Select } from "../components/Row";
-import type { Cleanup, Device, ModelStatus, Processing, Settings } from "../lib/settings";
+import type { Cleanup, Device, ModelStatus, Settings } from "../lib/settings";
 import { LANGUAGES, polishStatus, type PolishStatus } from "../lib/settings";
 
 /** The example from the design, showing what each cleanup strength does. */
@@ -35,18 +35,9 @@ export function Voice({
     <>
       <Row
         label="Processing"
-        hint="Local never leaves the machine. Cloud is faster on a slow computer and is not."
+        hint="Speech is recognised on this machine and never leaves it. A cloud option is planned for computers without a usable GPU; it is not built, so it is not offered."
       >
-        <Segmented<Processing>
-          value={settings.processing}
-          options={[
-            { value: "local", label: "On this PC" },
-            { value: "cloud", label: "Klar cloud" },
-          ]}
-          onChange={(processing) => {
-            onChange({ ...settings, processing });
-          }}
-        />
+        <span className="figure">On this PC</span>
       </Row>
 
       <Row
@@ -187,8 +178,7 @@ function PolishModel({
     return (
       <Row
         label="Polish model"
-        hint={`Nothing is answering at ${status.endpoint}. Install Ollama and pull a model — until then dictation still works and the transcript goes in as recognised.`}
-        alert
+        hint={`Nothing is answering at ${status.endpoint}. Install Ollama and pull a model to switch this on — dictation works without it and inserts the transcript as recognised.`}
       >
         <span className="figure">Off</span>
       </Row>
@@ -203,7 +193,6 @@ function PolishModel({
           ? "Runs on this machine. Nothing is sent anywhere."
           : "Pick one to switch the polish stage on."
       }
-      alert={!settings.polishModel}
     >
       <Select
         value={settings.polishModel}

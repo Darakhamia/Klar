@@ -67,10 +67,10 @@ pub fn run() {
 
             // Both windows start hidden so a fresh install never flashes the
             // settings window behind onboarding.
-            if settings.onboarded {
-                tray::show_settings(&handle);
-            } else {
+            if !settings.onboarded {
                 onboarding::show(&handle);
+            } else if !started_hidden() {
+                tray::show_settings(&handle);
             }
 
             Ok(())
@@ -97,6 +97,15 @@ pub fn run() {
             tracing::error!(%error, "tauri failed to start");
             std::process::exit(1);
         });
+}
+
+/// Whether this launch should stay in the tray.
+///
+/// The Run-key entry passes `--hidden`, so starting with Windows puts Klar
+/// where it belongs — in the tray — while opening it by hand shows the window,
+/// because opening an app by hand is a request to see it.
+fn started_hidden() -> bool {
+    std::env::args().any(|argument| argument == "--hidden")
 }
 
 /// Stop whatever is running and start again with these settings.

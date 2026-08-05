@@ -91,7 +91,11 @@ pub fn set_launch_at_login(on: bool) -> Result<(), PlatformError> {
 
     // Quoted, because Windows splits an unquoted Run value on spaces and
     // `C:\Program Files\Klar\klar.exe` would be run as `C:\Program`.
-    let command = format!("\"{}\"", exe.display());
+    //
+    // `--hidden` is what makes this bearable: starting with Windows should put
+    // Klar in the tray, not put a settings window in front of somebody who has
+    // just logged in and is trying to open something else.
+    let command = format!("\"{}\" --hidden", exe.display());
 
     // REG_SZ data includes the terminator, so it is pushed rather than assumed.
     let mut wide: Vec<u16> = command.encode_utf16().collect();
