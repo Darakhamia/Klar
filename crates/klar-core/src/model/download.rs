@@ -264,8 +264,16 @@ mod tests {
 
             loop {
                 let mut line = String::new();
-                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
-                    break;
+                // Not `unwrap_or(0)`: swallowing a read error here would end
+                // the header loop early, and the server would answer 200
+                // without ever having seen the Range header — which the resume
+                // test then reports as the downloader failing to resume. A
+                // broken test server must look broken.
+                match reader.read_line(&mut line) {
+                    Ok(0) => break,
+                    Ok(_) if line == "\r\n" => break,
+                    Ok(_) => {}
+                    Err(error) => panic!("test server could not read the request: {error}"),
                 }
                 if let Some(rest) = line.to_ascii_lowercase().strip_prefix("range: bytes=") {
                     range_from = rest.trim().trim_end_matches('-').parse().unwrap_or(0);

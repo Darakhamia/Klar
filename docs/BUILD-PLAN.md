@@ -56,6 +56,8 @@ The polish prompt must: remove fillers, fix punctuation and capitalization, reso
 
 A cleanup strength setting maps to different prompts: verbatim, light, standard, heavy.
 
+Verbatim is not a gentle prompt — it is off. The polisher is never constructed and never called, so the transcript goes straight to injection and nothing is sent to a language model, local or otherwise. It must stay possible to run Klar this way indefinitely, and switching to it must take effect on the very next dictation.
+
 **Done when:** the fixture set passes, and polish adds under 400 ms on the local path.
 
 ---

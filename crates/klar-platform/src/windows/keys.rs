@@ -1,55 +1,53 @@
 //! Mapping Klar's platform-independent [`Binding`] onto Windows virtual keys.
 
-use crate::{Binding, Key, Modifier};
+use crate::{Binding, HIGHEST_FUNCTION_KEY, Key, Modifier};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_F1, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7,
-    VK_F8, VK_F9, VK_F10, VK_F11, VK_F12, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU,
-    VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_SPACE,
+    GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_F1, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
+    VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SHIFT, VK_SPACE,
 };
 
+/// Windows has no constants for the letter and digit keys: their virtual key
+/// codes are the ASCII codes of the uppercase character.
+const fn character_key(character: char) -> Option<VIRTUAL_KEY> {
+    let upper = character.to_ascii_uppercase();
+    if upper.is_ascii_alphanumeric() {
+        Some(VIRTUAL_KEY(upper as u16))
+    } else {
+        None
+    }
+}
+
 /// The virtual key a binding's trigger corresponds to, or `None` for keys that
-/// do not exist on Windows.
+/// do not exist on Windows or are outside the range Klar binds.
 pub fn virtual_key(key: Key) -> Option<VIRTUAL_KEY> {
-    Some(match key {
-        Key::Space => VK_SPACE,
-        Key::F1 => VK_F1,
-        Key::F2 => VK_F2,
-        Key::F3 => VK_F3,
-        Key::F4 => VK_F4,
-        Key::F5 => VK_F5,
-        Key::F6 => VK_F6,
-        Key::F7 => VK_F7,
-        Key::F8 => VK_F8,
-        Key::F9 => VK_F9,
-        Key::F10 => VK_F10,
-        Key::F11 => VK_F11,
-        Key::F12 => VK_F12,
+    match key {
+        Key::Space => Some(VK_SPACE),
+        // VK_F1 through VK_F24 are contiguous.
+        Key::Function(number) if (1..=HIGHEST_FUNCTION_KEY).contains(&number) => {
+            Some(VIRTUAL_KEY(VK_F1.0 + u16::from(number) - 1))
+        }
+        Key::Function(_) => None,
+        Key::Character(character) => character_key(character),
         // macOS only; there is no Windows equivalent to bind.
-        Key::Fn => return None,
-    })
+        Key::Fn => None,
+    }
 }
 
 /// The [`Key`] a virtual key code corresponds to, or `None` for the ones Klar
 /// will not bind. The inverse of [`virtual_key`], used while capturing a chord.
 pub fn key_from_virtual(code: u32) -> Option<Key> {
-    const KEYS: &[Key] = &[
-        Key::Space,
-        Key::F1,
-        Key::F2,
-        Key::F3,
-        Key::F4,
-        Key::F5,
-        Key::F6,
-        Key::F7,
-        Key::F8,
-        Key::F9,
-        Key::F10,
-        Key::F11,
-        Key::F12,
-    ];
-    KEYS.iter()
-        .copied()
-        .find(|key| virtual_key(*key).is_some_and(|vk| u32::from(vk.0) == code))
+    if code == u32::from(VK_SPACE.0) {
+        return Some(Key::Space);
+    }
+
+    let first_function = u32::from(VK_F1.0);
+    if (first_function..first_function + u32::from(HIGHEST_FUNCTION_KEY)).contains(&code) {
+        let number = u8::try_from(code - first_function).ok()? + 1;
+        return Some(Key::Function(number));
+    }
+
+    let character = char::from_u32(code)?;
+    Key::from_character(character)
 }
 
 /// True for the modifier keys themselves, which complete no chord on their own.
@@ -138,38 +136,53 @@ mod tests {
 
     #[test]
     fn every_bindable_key_has_a_virtual_key() {
-        for key in [
-            Key::Space,
-            Key::F1,
-            Key::F2,
-            Key::F3,
-            Key::F4,
-            Key::F5,
-            Key::F6,
-            Key::F7,
-            Key::F8,
-            Key::F9,
-            Key::F10,
-            Key::F11,
-            Key::F12,
-        ] {
+        let mut keys = vec![Key::Space];
+        keys.extend((1..=HIGHEST_FUNCTION_KEY).map(Key::Function));
+        keys.extend(
+            "abcdefghijklmnopqrstuvwxyz0123456789"
+                .chars()
+                .map(|c| Key::from_character(c).expect("letters and digits are keys")),
+        );
+
+        for key in keys {
             assert!(virtual_key(key).is_some(), "{key:?} has no VK");
         }
     }
 
     #[test]
     fn virtual_keys_round_trip_back_to_their_key() {
-        for key in [Key::Space, Key::F1, Key::F9, Key::F12] {
+        let keys = [
+            Key::Space,
+            Key::Function(1),
+            Key::Function(9),
+            Key::Function(12),
+            Key::Character('a'),
+            Key::Character('z'),
+            Key::Character('0'),
+            Key::Character('7'),
+        ];
+        for key in keys {
             let vk = virtual_key(key).expect("bindable");
             assert_eq!(key_from_virtual(u32::from(vk.0)), Some(key));
         }
     }
 
     #[test]
+    fn a_captured_letter_comes_back_lowercase() {
+        // Windows reports the uppercase code for a letter key whether or not
+        // Shift is held; the binding stores one spelling so it renders the same
+        // way every time.
+        assert_eq!(key_from_virtual(0x44), Some(Key::Character('d')));
+    }
+
+    #[test]
     fn keys_klar_will_not_bind_have_no_mapping() {
-        // 'A'. Bindable in principle, deliberately not offered: a held letter
-        // key is swallowed for as long as the dictation runs.
-        assert_eq!(key_from_virtual(0x41), None);
+        // F13 — beyond what is on a keyboard, and beyond what we map.
+        assert_eq!(virtual_key(Key::Function(13)), None);
+        assert_eq!(virtual_key(Key::Function(0)), None);
+        // Escape. Reserved for cancelling the capture itself.
+        assert_eq!(key_from_virtual(0x1B), None);
+
         assert!(is_modifier_key(u32::from(VK_LCONTROL.0)));
         assert!(!is_modifier_key(u32::from(VK_SPACE.0)));
     }
@@ -209,7 +222,7 @@ mod tests {
     fn a_binding_with_no_modifiers_is_always_satisfied() {
         let binding = Binding {
             modifiers: vec![],
-            key: Key::F1,
+            key: Key::Function(1),
         };
         assert!(modifiers_held(&binding));
     }

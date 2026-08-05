@@ -11,7 +11,9 @@ pub mod hotkey;
 pub mod inject;
 pub mod permissions;
 
-pub use hotkey::{BadBinding, Binding, Hotkey, HotkeyEvent, Key, Modifier, capture};
+pub use hotkey::{
+    BadBinding, Binding, HIGHEST_FUNCTION_KEY, Hotkey, HotkeyEvent, Key, Modifier, capture,
+};
 pub use inject::{InjectionMethod, TextInjector};
 pub use permissions::{Permission, PermissionState};
 
@@ -139,7 +141,7 @@ mod tests {
     fn a_function_key_needs_no_modifier() {
         let bare = Binding {
             modifiers: vec![],
-            key: Key::F9,
+            key: Key::Function(9),
         };
         assert_eq!(bare.check(), Ok(()));
     }

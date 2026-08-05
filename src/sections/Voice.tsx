@@ -94,11 +94,14 @@ export function Voice({
         </div>
       </Row>
 
-      <Row label="Cleanup strength" hint="How much Klar rewrites what you said.">
+      <Row
+        label="Cleanup strength"
+        hint="How much Klar rewrites what you said. Verbatim switches the polish stage off entirely — the transcript is inserted exactly as recognised, and no language model sees it."
+      >
         <Segmented<Cleanup>
           value={settings.cleanup}
           options={[
-            { value: "verbatim", label: "Verbatim" },
+            { value: "verbatim", label: "Verbatim — off" },
             { value: "light", label: "Light" },
             { value: "balanced", label: "Balanced" },
             { value: "heavy", label: "Heavy" },

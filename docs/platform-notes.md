@@ -9,6 +9,20 @@ Newest first.
 
 ## M6 — interface
 
+### "Type and copy" cannot be an inject followed by a copy
+
+Injection borrows the clipboard: snapshot, set our text, synthesise Ctrl+V,
+restore. The restore has to wait — `SendInput` returns as soon as the events
+are queued and the target reads the clipboard whenever it gets to the
+keystroke — so it runs on a background thread 150 ms later.
+
+Which means a copy issued straight after `inject` returns is silently
+overwritten a moment afterwards. The order was right and the timing was not.
+The injector needs a mode that skips the snapshot and leaves our text where it
+is, so `inject_and_keep` is a trait method rather than two calls at the call
+site. It is the one path allowed to lose the previous clipboard contents,
+because replacing them is exactly what the user asked for.
+
 ### Rebinding needs a second hook, not a mode on the first
 
 The push-to-talk hook and a capture hook want opposite things: one swallows a

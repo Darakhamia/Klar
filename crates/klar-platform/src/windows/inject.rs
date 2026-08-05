@@ -38,9 +38,22 @@ impl WindowsInjector {
     }
 }
 
+/// What happens to the clipboard afterwards.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Afterwards {
+    /// Put back what was there. Every path, including the failing ones.
+    Restore,
+    /// Leave our text on it — the user asked for a copy as well as a paste.
+    Keep,
+}
+
 impl TextInjector for WindowsInjector {
     fn inject(&mut self, text: &str) -> Result<InjectionMethod, PlatformError> {
         self.inject_using(text, InjectionMethod::Clipboard)
+    }
+
+    fn inject_and_keep(&mut self, text: &str) -> Result<InjectionMethod, PlatformError> {
+        deliver(text, InjectionMethod::Clipboard, Afterwards::Keep)
     }
 
     fn inject_using(
@@ -48,56 +61,73 @@ impl TextInjector for WindowsInjector {
         text: &str,
         method: InjectionMethod,
     ) -> Result<InjectionMethod, PlatformError> {
-        if text.is_empty() {
-            return Ok(method);
+        deliver(text, method, Afterwards::Restore)
+    }
+}
+
+fn deliver(
+    text: &str,
+    method: InjectionMethod,
+    afterwards: Afterwards,
+) -> Result<InjectionMethod, PlatformError> {
+    if text.is_empty() {
+        return Ok(method);
+    }
+
+    // Ask before acting: a paste into an elevated window is dropped without
+    // an error, and the user would see nothing happen at all.
+    elevation::check_foreground()?;
+
+    if method == InjectionMethod::Keystrokes {
+        // No clipboard involved, so nothing to save or restore. "Keep" still
+        // has to put the text there, since nothing else on this path does.
+        type_text(text)?;
+        if afterwards == Afterwards::Keep {
+            clipboard::set_text(text)?;
         }
+        return Ok(InjectionMethod::Keystrokes);
+    }
 
-        // Ask before acting: a paste into an elevated window is dropped without
-        // an error, and the user would see nothing happen at all.
-        elevation::check_foreground()?;
+    if afterwards == Afterwards::Keep {
+        // No snapshot at all: taking one would only be thrown away, and the
+        // clipboard is being replaced on purpose.
+        paste(text)?;
+        return Ok(InjectionMethod::Clipboard);
+    }
 
-        if method == InjectionMethod::Keystrokes {
-            // No clipboard involved, so nothing to save or restore.
-            type_text(text)?;
-            return Ok(InjectionMethod::Keystrokes);
+    let snapshot = clipboard::snapshot()?;
+    if !snapshot.is_complete() {
+        tracing::warn!(
+            formats = ?snapshot.skipped_formats(),
+            "some clipboard contents cannot be restored after this dictation"
+        );
+    }
+
+    // From here on, every exit restores.
+    match paste(text) {
+        Ok(()) => {
+            // Give the target time to read the clipboard before taking it back.
+            // Off the caller's thread: the text is already on its way, and the
+            // 50 ms injection budget covers reaching the app, not tidying up
+            // afterwards.
+            std::thread::Builder::new()
+                .name("klar-clipboard-restore".into())
+                .spawn(move || {
+                    std::thread::sleep(PASTE_SETTLE);
+                    if let Err(error) = snapshot.restore() {
+                        tracing::error!(%error, "could not restore the clipboard");
+                    }
+                })
+                .map_err(|e| PlatformError::Clipboard(e.to_string()))?;
+            Ok(InjectionMethod::Clipboard)
         }
-
-        let snapshot = clipboard::snapshot()?;
-        if !snapshot.is_complete() {
-            tracing::warn!(
-                formats = ?snapshot.skipped_formats(),
-                "some clipboard contents cannot be restored after this dictation"
-            );
-        }
-
-        // From here on, every exit restores.
-        let outcome = paste(text);
-
-        match outcome {
-            Ok(()) => {
-                // Give the target time to read the clipboard before taking it
-                // back. Off the caller's thread: the text is already on its way,
-                // and the 50 ms injection budget covers reaching the app, not
-                // tidying up afterwards.
-                std::thread::Builder::new()
-                    .name("klar-clipboard-restore".into())
-                    .spawn(move || {
-                        std::thread::sleep(PASTE_SETTLE);
-                        if let Err(error) = snapshot.restore() {
-                            tracing::error!(%error, "could not restore the clipboard");
-                        }
-                    })
-                    .map_err(|e| PlatformError::Clipboard(e.to_string()))?;
-                Ok(InjectionMethod::Clipboard)
+        Err(error) => {
+            // Restore immediately and synchronously — nothing was pasted, so
+            // there is nothing to wait for.
+            if let Err(restore_error) = snapshot.restore() {
+                tracing::error!(%restore_error, "could not restore the clipboard after a failed paste");
             }
-            Err(error) => {
-                // Restore immediately and synchronously — nothing was pasted,
-                // so there is nothing to wait for.
-                if let Err(restore_error) = snapshot.restore() {
-                    tracing::error!(%restore_error, "could not restore the clipboard after a failed paste");
-                }
-                Err(error)
-            }
+            Err(error)
         }
     }
 }

@@ -171,6 +171,7 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
         }
     };
 
+    tracing::info!(?timeout, "capture hook installed; waiting for a chord");
     let outcome = chord_rx.recv_timeout(timeout);
 
     // Whatever happened, the hook comes down before this returns. Leaving a
@@ -195,6 +196,8 @@ pub fn capture_binding(timeout: Duration) -> Result<Binding, PlatformError> {
     if code == u32::from(VK_ESCAPE.0) {
         return Err(BadBinding::Cancelled.into());
     }
+
+    tracing::info!(vk = format!("{code:#04x}"), mask, "chord captured");
 
     let key = keys::key_from_virtual(code).ok_or(BadBinding::UnsupportedKey)?;
     let binding = Binding {

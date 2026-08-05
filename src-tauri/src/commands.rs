@@ -79,6 +79,7 @@ pub fn settings_set(app: AppHandle, settings: Settings) -> Result<(), String> {
 pub fn hotkey_capture(app: AppHandle) {
     let handle = app.clone();
     std::thread::spawn(move || {
+        tracing::info!("rebinding: stopping the engine");
         crate::stop_engine(&handle);
 
         let captured = klar_platform::capture(CAPTURE_TIMEOUT);
@@ -86,15 +87,19 @@ pub fn hotkey_capture(app: AppHandle) {
         let mut settings = Settings::load();
         let result = match captured {
             Ok(binding) => {
+                tracing::info!(?binding, "rebinding: accepted");
                 settings.hotkey = binding.clone();
                 match settings.save() {
                     Ok(()) => CaptureResult::Bound { binding },
                     Err(message) => CaptureResult::Refused { message },
                 }
             }
-            Err(error) => CaptureResult::Refused {
-                message: error.to_string(),
-            },
+            Err(error) => {
+                tracing::info!(%error, "rebinding: refused");
+                CaptureResult::Refused {
+                    message: error.to_string(),
+                }
+            }
         };
 
         // The engine comes back either way: leaving the app without a hotkey

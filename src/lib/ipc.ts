@@ -16,21 +16,10 @@ export interface AppVersion {
 }
 
 export type Modifier = "control" | "alt" | "shift" | "meta";
-export type Key =
-  | "space"
-  | "fn"
-  | "f1"
-  | "f2"
-  | "f3"
-  | "f4"
-  | "f5"
-  | "f6"
-  | "f7"
-  | "f8"
-  | "f9"
-  | "f10"
-  | "f11"
-  | "f12";
+
+/** Mirrors `Key` in `crates/klar-platform/src/hotkey.rs`. Serde writes the unit
+ * variants as strings and the two that carry a value as one-key objects. */
+export type Key = "space" | "fn" | { function: number } | { character: string };
 
 export interface Binding {
   modifiers: Modifier[];
@@ -165,22 +154,12 @@ const MODIFIER_GLYPHS: Record<Modifier, { mac: string; other: string }> = {
   meta: { mac: "⌘", other: "Win" },
 };
 
-const KEY_LABELS: Record<Key, string> = {
-  space: "Space",
-  fn: "fn",
-  f1: "F1",
-  f2: "F2",
-  f3: "F3",
-  f4: "F4",
-  f5: "F5",
-  f6: "F6",
-  f7: "F7",
-  f8: "F8",
-  f9: "F9",
-  f10: "F10",
-  f11: "F11",
-  f12: "F12",
-};
+function keyLabel(key: Key): string {
+  if (key === "space") return "Space";
+  if (key === "fn") return "fn";
+  if ("function" in key) return `F${String(key.function)}`;
+  return key.character.toUpperCase();
+}
 
 /** Render a binding the way the design writes it: `CTRL SPACE`, `⌥ SPACE`. */
 export function formatBinding(binding: Binding, os: string): string {
@@ -188,6 +167,6 @@ export function formatBinding(binding: Binding, os: string): string {
   const parts = binding.modifiers.map((m) =>
     mac ? MODIFIER_GLYPHS[m].mac : MODIFIER_GLYPHS[m].other,
   );
-  parts.push(KEY_LABELS[binding.key]);
+  parts.push(keyLabel(binding.key));
   return parts.join(mac ? " " : " + ").toUpperCase();
 }

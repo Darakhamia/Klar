@@ -107,11 +107,11 @@ function Hotkey({ settings, os }: { settings: Settings; os: string }) {
   // hook cannot race the capture — so the row says what to do rather than
   // leaving the old binding looking live.
   const hint = capturing
-    ? "Hold the keys you want. Escape cancels, and Space needs a modifier."
+    ? "Hold a modifier and press a letter, a digit, Space or an F-key. Escape cancels."
     : (refused ?? "Hold to dictate. Release to insert.");
 
   return (
-    <Row label="Dictation hotkey" hint={hint}>
+    <Row label="Dictation hotkey" hint={hint} alert={refused !== null && !capturing}>
       <Figure>{formatBinding(settings.hotkey, os)}</Figure>
       <button
         type="button"

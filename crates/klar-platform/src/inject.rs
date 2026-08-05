@@ -36,4 +36,16 @@ pub trait TextInjector: Send {
         text: &str,
         method: InjectionMethod,
     ) -> Result<InjectionMethod, PlatformError>;
+
+    /// Insert `text` and leave it on the clipboard, instead of putting back
+    /// what was there.
+    ///
+    /// The "type and copy" setting. It has to be its own method rather than a
+    /// copy issued after [`Self::inject`]: the paste is asynchronous, so the
+    /// restore runs on a timer after `inject` has already returned, and a copy
+    /// made in between is overwritten a moment later.
+    ///
+    /// This is the one path that is allowed to lose the previous clipboard
+    /// contents, because replacing them is what the user asked for.
+    fn inject_and_keep(&mut self, text: &str) -> Result<InjectionMethod, PlatformError>;
 }

@@ -11,17 +11,21 @@ import type { ReactNode } from "react";
 export function Row({
   label,
   hint,
+  /** Red, for a hint that is telling the user something went wrong. Red marks
+   * only what is on or what needs attention — never decoration. */
+  alert = false,
   children,
 }: {
   label: string;
   hint?: string;
+  alert?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="row">
       <div className="row__text">
         <div className="row__label">{label}</div>
-        {hint && <div className="row__hint">{hint}</div>}
+        {hint && <div className={alert ? "row__hint row__hint--alert" : "row__hint"}>{hint}</div>}
       </div>
       <div className="row__control">{children}</div>
     </div>

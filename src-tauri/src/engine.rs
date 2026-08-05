@@ -368,14 +368,10 @@ fn deliver(
     match finish {
         FinishAction::Type => injector.inject(text).map(Some),
         FinishAction::Copy => klar_platform::copy_to_clipboard(text).map(|()| None),
-        FinishAction::TypeAndCopy => {
-            // Injection borrows the clipboard and puts back what was there, so
-            // the copy has to come after it — the other order would be undone
-            // by the restore.
-            let method = injector.inject(text)?;
-            klar_platform::copy_to_clipboard(text)?;
-            Ok(Some(method))
-        }
+        // Not `inject` followed by a copy: the restore that injection schedules
+        // runs on a timer after it returns, so a copy made in between is wiped
+        // 150 ms later. The injector has to be told to keep the text instead.
+        FinishAction::TypeAndCopy => injector.inject_and_keep(text).map(Some),
     }
 }
 

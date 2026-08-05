@@ -44,11 +44,11 @@ pub enum Modifier {
     Meta,
 }
 
-/// The non-modifier keys Klar will bind to.
+/// The non-modifier key that completes a binding.
 ///
-/// Deliberately short. A push-to-talk key is held for seconds at a time and is
-/// swallowed while Klar owns it, so the list is the keys people actually reach
-/// for and nothing that would quietly break typing.
+/// The hook only swallows this key while the binding's modifiers are also
+/// held, so binding a letter costs nothing the rest of the time. Bound *bare*
+/// is the dangerous case, which is what [`Self::is_bindable_alone`] is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Key {
@@ -56,28 +56,41 @@ pub enum Key {
     /// macOS only, and only reachable through an `NSEvent` global monitor —
     /// `fn` does not appear in a normal event tap.
     Fn,
-    F1,
-    F2,
-    F3,
-    F4,
-    F5,
-    F6,
-    F7,
-    F8,
-    F9,
-    F10,
-    F11,
-    F12,
+    /// F1 to F12. Anything higher is not on the keyboards people have.
+    Function(u8),
+    /// A letter or a digit, held lowercase: `a`–`z`, `0`–`9`.
+    Character(char),
 }
 
+/// The highest function key Klar will bind.
+pub const HIGHEST_FUNCTION_KEY: u8 = 12;
+
 impl Key {
-    /// True for keys that carry no meaning on their own, and so may be bound
+    /// A letter or digit as a [`Key`], or `None` for anything else.
+    pub fn from_character(character: char) -> Option<Self> {
+        let lowered = character.to_ascii_lowercase();
+        lowered
+            .is_ascii_alphanumeric()
+            .then_some(Self::Character(lowered))
+    }
+
+    /// True for keys that mean nothing on their own, and so may be bound
     /// without a modifier.
     ///
-    /// Space may not: binding it bare would swallow every space the user types,
-    /// everywhere, for as long as Klar is running.
+    /// Space and the character keys may not: bound bare, the hook would
+    /// swallow every one the user typed, everywhere, for as long as Klar runs.
     pub const fn is_bindable_alone(self) -> bool {
-        !matches!(self, Self::Space)
+        matches!(self, Self::Function(_) | Self::Fn)
+    }
+
+    /// Whether this is a key at all, as opposed to a number outside the range
+    /// or a character that is not a letter or a digit.
+    pub const fn is_valid(self) -> bool {
+        match self {
+            Self::Space | Self::Fn => true,
+            Self::Function(number) => number >= 1 && number <= HIGHEST_FUNCTION_KEY,
+            Self::Character(character) => character.is_ascii_alphanumeric(),
+        }
     }
 }
 
@@ -87,22 +100,28 @@ impl Key {
 /// window shows, and every case has a different fix.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum BadBinding {
-    #[error("that key cannot be used for push-to-talk")]
+    #[error("Klar binds a letter, a digit, Space or F1–F12. That key is none of them.")]
     UnsupportedKey,
 
-    #[error("Space needs a modifier — bound on its own it would swallow every space you type")]
+    #[error(
+        "That key needs a modifier — Ctrl, Alt, Shift or Win. \
+         Bound on its own, Klar would swallow it everywhere you type."
+    )]
     NeedsModifier,
 
-    #[error("nothing was pressed")]
+    #[error("Nothing was pressed.")]
     TimedOut,
 
-    #[error("cancelled")]
+    #[error("Cancelled — the hotkey is unchanged.")]
     Cancelled,
 }
 
 impl Binding {
     /// Whether this chord is safe to install as push-to-talk.
     pub fn check(&self) -> Result<(), BadBinding> {
+        if !self.key.is_valid() {
+            return Err(BadBinding::UnsupportedKey);
+        }
         if self.modifiers.is_empty() && !self.key.is_bindable_alone() {
             return Err(BadBinding::NeedsModifier);
         }
