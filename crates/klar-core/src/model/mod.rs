@@ -46,7 +46,7 @@ pub const CATALOGUE: &[ModelSpec] = &[
         sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
         bytes: 574_041_195,
         multilingual: true,
-        summary: "Default. Multilingual, quantised — the quality Klar was tuned for.",
+        summary: "Default. Multilingual, quantised to a third of the size. Quantisation costs accuracy, and it costs it first on the words a dictionary exists for: names, jargon, anything rare.",
     },
     ModelSpec {
         id: "large-v3-turbo",
@@ -55,7 +55,7 @@ pub const CATALOGUE: &[ModelSpec] = &[
         sha256: "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
         bytes: 1_624_555_275,
         multilingual: true,
-        summary: "Unquantised. Marginally better, three times the memory.",
+        summary: "Unquantised. Better on unfamiliar words, three times the memory and the download. Worth it on a machine with a graphics card to spare.",
     },
     ModelSpec {
         id: "silero-vad",

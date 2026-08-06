@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { Row, Segmented, Select } from "../components/Row";
-import type { Acceleration, Cleanup, Device, ModelStatus, Settings } from "../lib/settings";
+import type {
+  Acceleration,
+  Accuracy,
+  Cleanup,
+  Device,
+  ModelStatus,
+  Settings,
+} from "../lib/settings";
 import { LANGUAGES, acceleration, polishStatus, type PolishStatus } from "../lib/settings";
 
 /** The example from the design, showing what each cleanup strength does. */
@@ -39,7 +46,7 @@ export function Voice({
         label="Model"
         hint={
           current
-            ? `${current.size} — ${current.installed ? "installed" : "not downloaded"}`
+            ? `${current.summary} ${current.size}, ${current.installed ? "installed" : "not downloaded"}.`
             : "One model is loaded at a time."
         }
       >
@@ -51,6 +58,22 @@ export function Voice({
           }))}
           onChange={(model) => {
             onChange({ ...settings, model });
+          }}
+        />
+      </Row>
+
+      <Row
+        label="Recognition"
+        hint="Accurate weighs several candidates for each word instead of taking the first. It costs time on every dictation and buys back the words that sound like other words — names, jargon, anything the model has not seen before. Measured at 260 ms against a 500 ms budget on Fast, so there is room."
+      >
+        <Segmented<Accuracy>
+          value={settings.accuracy}
+          options={[
+            { value: "fast", label: "Fast" },
+            { value: "accurate", label: "Accurate" },
+          ]}
+          onChange={(accuracy) => {
+            onChange({ ...settings, accuracy });
           }}
         />
       </Row>

@@ -191,9 +191,18 @@ impl Transcriber for WhisperTranscriber {
             });
         }
 
-        // Greedy with a single candidate: beam search buys accuracy Klar does
-        // not need and costs latency it cannot spare.
-        let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+        // Greedy unless asked otherwise. M3 fixed this at greedy on the grounds
+        // that beam search "costs latency it cannot spare"; the measurement
+        // afterwards was 260 ms against a 500 ms criterion, so it can. Which one
+        // runs is now the user's, per [`Accuracy`].
+        let strategy = match options.accuracy.beam_size() {
+            Some(beam_size) => SamplingStrategy::BeamSearch {
+                beam_size,
+                patience: -1.0,
+            },
+            None => SamplingStrategy::Greedy { best_of: 1 },
+        };
+        let mut params = FullParams::new(strategy);
         params.set_n_threads(
             options.threads.unwrap_or(self.default_threads).clamp(1, 32) as std::ffi::c_int
         );

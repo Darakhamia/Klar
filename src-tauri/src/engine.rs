@@ -54,6 +54,7 @@ pub struct EngineConfig {
     pub hotkey: Binding,
     pub finish: FinishAction,
     pub cleanup: Strength,
+    pub accuracy: klar_core::asr::Accuracy,
     /// `None` leaves the transcript alone — see `Settings::polish`.
     pub polish: Option<OllamaConfig>,
     pub stream: StreamConfig,
@@ -68,6 +69,7 @@ impl Default for EngineConfig {
             hotkey: klar_platform::default_binding(),
             finish: FinishAction::default(),
             cleanup: Strength::default(),
+            accuracy: klar_core::asr::Accuracy::default(),
             polish: None,
             stream: StreamConfig::default(),
         }
@@ -83,6 +85,7 @@ impl From<&crate::settings::Settings> for EngineConfig {
             hotkey: settings.hotkey.clone(),
             finish: settings.on_finish,
             cleanup: settings.cleanup,
+            accuracy: settings.accuracy,
             polish: settings.polish(),
             stream: StreamConfig::default(),
         }
@@ -325,6 +328,7 @@ fn dictate(
         // Biases recognition toward the taught words before anything is
         // decoded; `Dictionary::apply` below fixes what this misses.
         initial_prompt: dictionary.prompt().map(|(prompt, _)| prompt),
+        accuracy: config.accuracy,
         ..TranscribeOptions::default()
     };
 

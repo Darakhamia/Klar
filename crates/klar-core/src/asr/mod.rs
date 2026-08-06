@@ -82,6 +82,44 @@ impl std::fmt::Display for Backend {
     }
 }
 
+/// How hard whisper works to decide between candidates that sound alike.
+///
+/// M3 chose greedy decoding and said beam search "buys accuracy Klar does not
+/// need and costs latency it cannot spare". The first half of that turned out
+/// to be wrong and the second half was a guess made before anything was
+/// measured: key-up to inserted text came in at a 260 ms median against a
+/// 500 ms criterion, which is a great deal of room.
+///
+/// Greedy takes the most likely next token and never reconsiders. On a word the
+/// model is confident about that is the same answer beam search would reach, in
+/// a fraction of the time. On a name it has never seen — which is exactly what
+/// a dictation app is asked to spell — it commits to the first plausible sound
+/// and cannot back out. That is the failure people describe as "it gets some
+/// words wrong every time".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Accuracy {
+    /// Greedy, one candidate. The fastest thing whisper will do.
+    #[default]
+    Fast,
+    /// Beam search across five candidates. Slower, and better at the words that
+    /// are worth having a dictionary for.
+    Accurate,
+}
+
+impl Accuracy {
+    /// The beam width, or `None` for greedy.
+    ///
+    /// Five is whisper.cpp's own default and the point where the curve flattens;
+    /// wider costs exponential time for very little.
+    pub const fn beam_size(self) -> Option<i32> {
+        match self {
+            Self::Fast => None,
+            Self::Accurate => Some(5),
+        }
+    }
+}
+
 /// Per-utterance settings.
 #[derive(Debug, Clone, Default)]
 pub struct TranscribeOptions {
@@ -95,6 +133,9 @@ pub struct TranscribeOptions {
 
     /// `None` lets the implementation pick from the core count.
     pub threads: Option<usize>,
+
+    /// How hard to work on ambiguous words. See [`Accuracy`].
+    pub accuracy: Accuracy,
 }
 
 /// What came back.

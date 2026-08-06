@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
-use klar_core::asr::{TranscribeOptions, Transcriber, WhisperTranscriber};
+use klar_core::asr::{Accuracy, TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
 use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
@@ -260,6 +260,27 @@ struct DictateArgs {
     /// Trailing silence that counts as the end of a phrase, in milliseconds.
     #[arg(long, default_value_t = 700)]
     commit_silence: u64,
+    /// fast (greedy, the default) or accurate (beam search over 5 candidates).
+    ///
+    /// The dial this exists to measure. Run twenty dictations each way and
+    /// compare the reported median against the words you actually got.
+    #[arg(long, default_value = "fast")]
+    accuracy: AccuracyArg,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum AccuracyArg {
+    Fast,
+    Accurate,
+}
+
+impl From<AccuracyArg> for Accuracy {
+    fn from(accuracy: AccuracyArg) -> Self {
+        match accuracy {
+            AccuracyArg::Fast => Self::Fast,
+            AccuracyArg::Accurate => Self::Accurate,
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -854,6 +875,7 @@ fn dictate(args: &DictateArgs) -> Result<()> {
         // Biases recognition toward the taught words before anything is
         // decoded. The substitution below catches what this misses.
         initial_prompt: dictionary.prompt().map(|(prompt, _)| prompt),
+        accuracy: args.accuracy.into(),
         ..TranscribeOptions::default()
     };
     let config = StreamConfig {

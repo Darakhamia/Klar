@@ -13,6 +13,8 @@ export type OverlayPosition = "bottomCentre" | "nearCursor" | "topCentre";
 export type Processing = "local" | "cloud";
 export type Cleanup = "verbatim" | "light" | "balanced" | "heavy";
 export type Appearance = "system" | "light" | "dark";
+/** Mirrors `Accuracy` in `crates/klar-core/src/asr/mod.rs`. */
+export type Accuracy = "fast" | "accurate";
 
 export interface Settings {
   hotkey: Binding;
@@ -24,6 +26,7 @@ export interface Settings {
   model: string;
   microphone: string | null;
   cleanup: Cleanup;
+  accuracy: Accuracy;
   polishEndpoint: string;
   polishModel: string;
   appearance: Appearance;

@@ -1,15 +1,38 @@
 # Changelog
 
-Klar is unsigned and has no auto-update, so an installer is handed to somebody
-and then lives on their machine until they replace it. That makes the version in
-the filename the only way anyone — including whoever built it — can tell which
-Klar they are running. Bump it in the same commit as the change.
+Since 0.3.0 Klar updates itself, which makes the version number load-bearing:
+the updater compares it against the one in the manifest and does nothing when
+they match. A change shipped without a bump reaches nobody. Bump it in the same
+commit as the change.
 
 The number lives in three files and they must agree: `Cargo.toml` (workspace),
 `package.json`, and `src-tauri/tauri.conf.json`. The last is the one that names
 the installer.
 
 Newest first.
+
+---
+
+## 0.3.1
+
+**Recognition accuracy is now a setting.** Settings → Voice → Recognition
+chooses between Fast and Accurate. Fast is what every version so far did:
+whisper takes the first word it thinks of and moves on. Accurate weighs five
+candidate transcriptions and keeps the best — which is what buys back the words
+that sound like other words, the same words a dictionary exists for.
+
+M3 fixed this at Fast on the grounds that beam search "costs latency it cannot
+spare". That was a guess made before anything was measured; the measurement
+afterwards was 260 ms against a 500 ms budget. The guess was wrong, and the
+setting is the correction. Fast stays the default because it is what everyone
+running now already has.
+
+`klar-cli dictate --accuracy fast|accurate` runs both, so the cost on a given
+machine is measurable rather than argued about.
+
+The two model descriptions were rewritten to say what they were hiding: the
+quantised default trades accuracy first on rare words, which is exactly the
+case a person hunting a dictionary fix is in.
 
 ---
 

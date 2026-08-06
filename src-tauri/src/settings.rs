@@ -4,6 +4,7 @@
 //! is a dozen fields read once at startup, and the database in M5 is for
 //! dictations, the dictionary and statistics — things there are thousands of.
 
+use klar_core::asr::Accuracy;
 use klar_core::polish::{OllamaConfig, Strength};
 use klar_platform::Binding;
 use serde::{Deserialize, Serialize};
@@ -66,6 +67,12 @@ pub struct Settings {
     /// Device name, or `None` for the system default.
     pub microphone: Option<String>,
     pub cleanup: Strength,
+    /// How hard whisper works on words that sound like other words.
+    ///
+    /// Fast by default, which is what M3 measured. Accurate costs time on every
+    /// dictation and buys back exactly the case a dictionary exists for: a name
+    /// the model has never seen.
+    pub accuracy: Accuracy,
     /// Where the local model server is, and which of its models to use.
     ///
     /// An empty model name is the honest default: whatever a machine has pulled
@@ -101,6 +108,7 @@ impl Default for Settings {
             model: klar_core::model::DEFAULT_MODEL.to_owned(),
             microphone: None,
             cleanup: Strength::default(),
+            accuracy: Accuracy::default(),
             polish_endpoint: klar_core::polish::ollama::DEFAULT_ENDPOINT.to_owned(),
             polish_model: String::new(),
             appearance: Appearance::default(),
