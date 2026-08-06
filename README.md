@@ -478,10 +478,37 @@ Klar compares `version` against its own and offers the update when it is newer.
 **The manifest must not be cached the way the installers are.** Versioned
 installers are immutable and deserve a year; the manifest is the one file that
 changes, and a long `Cache-Control` on it means nobody ever sees another
-release. It needs its own nginx location — around a minute, with
-`must-revalidate` — and, behind Cloudflare, a cache rule that bypasses the edge
-for `/updates/*`. `release.ps1 -Verify` reads the header back and says so if it
-is wrong.
+release. It needs its own location, kept away from the one that serves the
+downloads:
+
+```nginx
+location /updates/ {
+    default_type application/json;
+    add_header Cache-Control "public, max-age=60, must-revalidate" always;
+    try_files $uri =404;
+}
+```
+
+Each line earns its place:
+
+- **`try_files $uri =404`.** A site with a single-page fallback answers a
+  missing file with 200 and the landing page. The updater would parse HTML as
+  JSON and report something vague about the server. A missing manifest has to
+  be a 404.
+- **`max-age=60`, not `no-cache`.** This file is fetched at every launch by
+  every user. A minute is enough for a release to reach everyone and spares the
+  origin the rest.
+- **`always`.** Not for 304s — those are in nginx's default status list for
+  `add_header` and get the header either way. It is for the 404 the line above
+  creates, which otherwise comes back with no `Cache-Control` at all.
+
+Behind Cloudflare, add a cache rule bypassing the edge for `/updates/*`. A
+`.json` is not in Cloudflare's default cacheable extensions, so it passes
+through today — but that is a default, and any later "Cache Everything" rule
+would silently start caching the manifest.
+
+`release.ps1 -Verify` reads the content type and the cache header back off the
+live URL and names whichever of the two is wrong.
 
 **Publish the Vulkan build to the update channel.** There is one
 `windows-x86_64` key and two flavours of installer, and Vulkan is the one that
