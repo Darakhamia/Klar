@@ -27,10 +27,24 @@ Perceived latency. From key release to text on screen:
 | Stage | Budget |
 |---|---|
 | Final transcription after key release | ≤ 400 ms |
-| LLM polish | ≤ 400 ms |
+| LLM polish | ≤ 800 ms |
 | Injection | ≤ 50 ms |
 
 If a design choice makes the app prettier or more general but blows this budget, the budget wins. Transcription runs **during** speech on a sliding window — do not wait for the key release to start ASR.
+
+Polish was 400 ms until a model was run against it. It is 800 ms because 400 ms
+admitted only models too small to do the job — measured, not assumed:
+Qwen2.5-1.5B translates Russian dictation into English and does not resolve
+self-corrections, and 3B is worse. Every competitor allows more. VoiceInk's own
+documentation says to change provider if enhancement regularly exceeds **two
+seconds**; Superwhisper measures GPT-5 mini at 200–400 ms and GPT-4o at
+400–800 ms on top of transcription. 800 ms stays the strictest number in the
+category while admitting a model that can actually clean up speech.
+
+This is the one budget that moved, it moved once, and it moved on evidence.
+Everything else in this table stands, and this line is not a precedent for
+widening the others — the rule against weakening a criterion to get past it
+still holds.
 
 ## Stack
 

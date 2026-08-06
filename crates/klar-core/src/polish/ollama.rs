@@ -5,7 +5,7 @@
 //! cloud path exists behind the same trait and is opt-in, visible, and not this
 //! file's problem.
 //!
-//! The 400 ms budget is not a target this stage tries to hit by being clever.
+//! The polish budget is not a target this stage tries to hit by being clever.
 //! It is enforced: a model that has not answered in time is abandoned and the
 //! transcript is used, because text arriving late is worse than text arriving
 //! plain.
@@ -42,7 +42,10 @@ impl Default for OllamaConfig {
         Self {
             endpoint: DEFAULT_ENDPOINT.to_owned(),
             model: String::new(),
-            budget: Duration::from_millis(400),
+            // 800 ms, not 400: see the budget table in CLAUDE.md. 400 admitted
+            // only models too small to clean up speech, which was measured
+            // rather than argued about.
+            budget: Duration::from_millis(800),
             keep_alive: "8h".to_owned(),
         }
     }
@@ -73,9 +76,9 @@ impl Ollama {
     /// Load the model into memory, so the first real dictation does not pay for
     /// it.
     ///
-    /// Measured at 25 seconds for a 3B model on a cold start, against a 400 ms
-    /// budget. There is no making that fast; there is only making it happen
-    /// before somebody is waiting on it.
+    /// Measured at 25 seconds for a 3B model on a cold start, against a budget
+    /// in hundreds of milliseconds. There is no making that fast; there is only
+    /// making it happen before somebody is waiting on it.
     pub async fn warm(&self) -> Result<Duration, PolishError> {
         let started = std::time::Instant::now();
 

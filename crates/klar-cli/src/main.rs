@@ -209,7 +209,7 @@ struct PolishArgs {
     #[arg(long, default_value = klar_core::polish::ollama::DEFAULT_ENDPOINT)]
     endpoint: String,
     /// How long the model gets before the transcript is used instead.
-    #[arg(long, default_value_t = 400)]
+    #[arg(long, default_value_t = 800)]
     budget_ms: u64,
 }
 
@@ -751,7 +751,7 @@ fn inject(args: &InjectArgs) -> Result<()> {
 /// Run one line of text through the polish stage and print what came back.
 ///
 /// The fastest way to see what a prompt does to a real dictation, and the only
-/// way to measure the stage against its 400 ms budget without speaking.
+/// way to measure the stage against its budget without speaking.
 async fn polish(args: &PolishArgs) -> Result<()> {
     let strength = Strength::from(args.strength);
     let cases = polish_cases(args)?;

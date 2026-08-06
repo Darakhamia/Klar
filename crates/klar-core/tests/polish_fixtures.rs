@@ -83,6 +83,22 @@ const FIXTURES: &[Fixture] = &[
         strength: Strength::Balanced,
         keeps: &["Friday", "notes"],
         // The abandoned half of the correction, and the fillers around it.
+        //
+        // Open, and the most dangerous of the open ones. No model measured
+        // resolves this: Qwen2.5-1.5B leaves "Thursday, no Friday" and
+        // Qwen3-4B writes "Thursday, not Friday", turning a correction into a
+        // negation.
+        //
+        // Do not fix it by pushing harder in the prompt. That was tried --
+        // spelling out that the abandoned word must not appear at all -- and
+        // Qwen3-4B then dropped *Friday* and kept Thursday, twice, identically.
+        // It would have typed the wrong date with no hedging in it, and neither
+        // the length guard nor the overlap guard can see that: both words were
+        // said out loud.
+        //
+        // The cue is not in the text. "Thursday no Friday" is a correction or a
+        // negation depending on a pause that whisper does not transcribe, so
+        // the fix is upstream of this stage rather than in these instructions.
         drops: &["Thursday", "um", "uh"],
         language: Some("en"),
     },

@@ -482,7 +482,7 @@ fn dictate(
 /// Load the polish model into memory, in the background, now.
 ///
 /// A cold Ollama takes tens of seconds to load a model — 25 seconds measured
-/// for a 3B one, against a 400 ms budget. Somebody is going to pay that, and it
+/// for a 3B one, against a budget in hundreds of milliseconds. Somebody is going to pay that, and it
 /// should be the app at startup rather than the user at their first sentence.
 ///
 /// Its own thread with its own runtime: this must not hold up registering the

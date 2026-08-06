@@ -58,27 +58,31 @@ pub const VAD_MODEL: &str = "silero-vad";
 /// point the 400 ms transcription budget was set against.
 pub const DEFAULT_MODEL: &str = "large-v3-turbo-q5_0";
 
-/// The default polish model.
+/// The default polish model: the smallest one measured that does the job.
 ///
-/// Qwen2.5-Instruct rather than anything newer or larger, for three reasons
-/// that are all about this stage in particular.
+/// Every entry below was run against `tests/polish_fixtures.rs`, which is the
+/// only reason any of this is asserted rather than assumed.
 ///
-/// It has no reasoning mode. Every current family at this size ships one that
-/// is on by default and emits its working before its answer, which against a
-/// 400 ms budget is not a quality trade-off but a disqualification — and one
-/// that has to be switched off through the chat template, which is a thing to
-/// get wrong per model rather than never.
+/// | Model | Fixtures | Where it fails |
+/// |---|---|---|
+/// | Qwen3-4B-Instruct-2507 | 4 of 6 | self-correction, code-switching |
+/// | Qwen2.5-3B | worse than 1.5B | truncates, mixes scripts — dropped |
+/// | Qwen2.5-1.5B | 3 of 6 | above, plus heavy leaves the padding in |
 ///
-/// It is strong in more than English at 1.5B, which most models this small are
-/// not. Klar polishes whatever was dictated, and a model that quietly rewrites
-/// Russian into English would fail in the one way [`crate::polish::guard`]
-/// cannot catch: the length and the word overlap of a translation look exactly
-/// like a cleanup.
+/// The `-Instruct-2507` suffix matters and is not decoration: plain Qwen3 has
+/// a reasoning mode that is on by default and writes its working before its
+/// answer, which against a budget in hundreds of milliseconds is not a quality
+/// trade-off but a disqualification. The 2507 instruct release has no such
+/// mode to switch off, so there is nothing to get wrong per model.
 ///
-/// And all three sizes are one family, so they follow the same prompt the same
-/// way. Somebody who moves from 1.5B to 3B for quality should get the same
-/// behaviour and more of it, not a different editor.
-pub const DEFAULT_POLISH_MODEL: &str = "qwen2.5-1.5b-instruct-q4";
+/// Being strong in more than English is a requirement rather than a bonus.
+/// Klar polishes whatever was dictated, and a model that rewrites Russian into
+/// English fails in a way that reads as Klar being broken.
+///
+/// Bigger is not the axis. 3B measured worse than the 1.5B it was meant to
+/// improve on — it dropped the first half of sentences — which is why the
+/// remaining three are two sizes of one family plus the one that beat both.
+pub const DEFAULT_POLISH_MODEL: &str = "qwen3-4b-instruct-q4";
 
 pub const CATALOGUE: &[ModelSpec] = &[
     ModelSpec {
@@ -122,6 +126,16 @@ pub const CATALOGUE: &[ModelSpec] = &[
         summary: "English only, low quality. For smoke-testing the pipeline, not for use.",
     },
     ModelSpec {
+        id: "qwen3-4b-instruct-q4",
+        kind: Kind::Polish,
+        file_name: "qwen3-4b-instruct-2507-q4_k_m.gguf",
+        url: "https://huggingface.co/bartowski/Qwen_Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen_Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        sha256: "2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e",
+        bytes: 2_497_280_736,
+        multilingual: true,
+        summary: "Default. The smallest model measured that cleans up dictation properly in more than English. Needs a graphics card to answer in time; without one it will miss the budget and the transcript will be used as it was heard.",
+    },
+    ModelSpec {
         id: "qwen2.5-1.5b-instruct-q4",
         kind: Kind::Polish,
         file_name: "qwen2.5-1.5b-instruct-q4_k_m.gguf",
@@ -129,17 +143,7 @@ pub const CATALOGUE: &[ModelSpec] = &[
         sha256: "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e",
         bytes: 1_117_320_736,
         multilingual: true,
-        summary: "Default. Cleans up dictation in the language it was spoken in, and answers inside the latency budget on a graphics card. Without one it will be slower than the budget allows and the transcript will often be used as-is.",
-    },
-    ModelSpec {
-        id: "qwen2.5-3b-instruct-q4",
-        kind: Kind::Polish,
-        file_name: "qwen2.5-3b-instruct-q4_k_m.gguf",
-        url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf",
-        sha256: "626b4a6678b86442240e33df819e00132d3ba7dddfe1cdc4fbb18e0a9615c62d",
-        bytes: 2_104_932_768,
-        multilingual: true,
-        summary: "Better judgement on long sentences and self-corrections, at roughly half the speed. For a machine with a graphics card to spare.",
+        summary: "Half the size and roughly three times the speed of the default, and it shows: it punctuates well but leaves self-corrections unresolved. For a machine that cannot keep the default inside the budget.",
     },
     ModelSpec {
         id: "qwen2.5-0.5b-instruct-q4",

@@ -68,7 +68,10 @@ impl Default for SidecarConfig {
         Self {
             program: PathBuf::from("klar-llm"),
             model: PathBuf::new(),
-            budget: Duration::from_millis(400),
+            // 800 ms, not 400: see the budget table in CLAUDE.md. 400 admitted
+            // only models too small to clean up speech, which was measured
+            // rather than argued about.
+            budget: Duration::from_millis(800),
             load_budget: Duration::from_secs(120),
             max_tokens: 512,
             ctx: 2048,
@@ -89,9 +92,9 @@ pub struct Ready {
 
 /// A running `klar-llm`, with its model already loaded.
 ///
-/// Held for the life of the app. Loading is seconds and the budget is 400 ms,
-/// so a polisher that started the model per dictation would miss the budget
-/// every time by two orders of magnitude.
+/// Held for the life of the app. Loading is seconds against a budget in
+/// hundreds of milliseconds, so a polisher that started the model per dictation
+/// would miss the budget every time by two orders of magnitude.
 pub struct Sidecar {
     child: Child,
     link: Link<ChildStdin>,
