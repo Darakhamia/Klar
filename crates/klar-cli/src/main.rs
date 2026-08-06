@@ -54,7 +54,7 @@ enum Command {
     Vad(VadArgs),
     /// Clean up a line of text through the local model, and time it.
     Polish(PolishArgs),
-    /// Manage the whisper models.
+    /// Manage the models Klar downloads: speech, voice activity and polish.
     #[command(subcommand)]
     Model(ModelCommand),
     /// Teach Klar the words whisper gets wrong, and check that it learned.
@@ -191,10 +191,11 @@ struct PolishArgs {
     #[arg(long)]
     language: Option<String>,
 
-    /// A GGUF to run in Klar's own sidecar. This is the path a normal install
-    /// takes; the Ollama options below are the alternative, not the default.
+    /// A GGUF to run in Klar's own sidecar, as a path or as a catalogue id such
+    /// as `qwen3-4b-instruct-q4`. This is the path a normal install takes; the
+    /// Ollama options below are the alternative, not the default.
     #[arg(long)]
-    gguf: Option<PathBuf>,
+    gguf: Option<String>,
     /// The klar-llm executable. Found beside this binary when omitted.
     #[arg(long)]
     sidecar: Option<PathBuf>,
@@ -846,6 +847,34 @@ fn polish_cases(args: &PolishArgs) -> Result<Vec<String>> {
     Ok(cases)
 }
 
+/// A GGUF by path, or by the name the catalogue knows it as.
+///
+/// The id is what a user has in front of them: they downloaded it with
+/// `model download qwen3-4b-instruct-q4` and have no reason to know which
+/// directory that landed in or what the file is called upstream.
+fn resolve_gguf(named: &str) -> Result<PathBuf> {
+    let as_path = PathBuf::from(named);
+    if as_path.is_file() {
+        return Ok(as_path);
+    }
+
+    let Some(spec) = model::find(named) else {
+        bail!("no file at {named}, and no model in the catalogue by that name");
+    };
+    if spec.kind != model::Kind::Polish {
+        bail!("{named} is a {:?} model, not one to polish with", spec.kind);
+    }
+
+    let dir = models_dir()?;
+    let path = model::path_in(&dir, spec);
+    if !path.is_file() {
+        bail!(
+            "{named} is in the catalogue but not on disk — run `klar-cli model download {named}`"
+        );
+    }
+    Ok(path)
+}
+
 /// Run the cases through Klar's own sidecar — the path an install takes.
 ///
 /// Prints what the model said *and* what the guard decided about it. Both,
@@ -857,12 +886,10 @@ async fn polish_with_sidecar(
     strength: Strength,
     cases: &[String],
 ) -> Result<()> {
-    let Some(gguf) = args.gguf.clone() else {
+    let Some(named) = args.gguf.as_deref() else {
         bail!("--gguf is required to run the sidecar");
     };
-    if !gguf.is_file() {
-        bail!("no model at {}", gguf.display());
-    }
+    let gguf = resolve_gguf(named)?;
 
     let program = match args.sidecar.clone() {
         Some(path) => path,
