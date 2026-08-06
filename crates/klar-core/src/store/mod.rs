@@ -19,8 +19,20 @@ mod migrations;
 
 use crate::dictionary::{Dictionary, Entry};
 use rusqlite::{Connection, OptionalExtension, params};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Where the database lives: beside the models, in the app data directory.
+///
+/// `KLAR_DB` overrides it, which is what keeps `klar-cli` experiments out of
+/// the history of somebody who is also using the app.
+pub fn default_path() -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("KLAR_DB") {
+        return Some(PathBuf::from(path));
+    }
+    directories::ProjectDirs::from("app", "Klar", "Klar")
+        .map(|dirs| dirs.data_local_dir().join("klar.db"))
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

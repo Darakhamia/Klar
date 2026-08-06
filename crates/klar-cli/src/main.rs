@@ -9,6 +9,7 @@ use klar_core::asr::{TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
 use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
+use klar_core::store::{NewDictation, Store};
 use klar_core::stream::{Stream, StreamConfig, StreamStats, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine};
@@ -56,8 +57,65 @@ enum Command {
     /// Manage the whisper models.
     #[command(subcommand)]
     Model(ModelCommand),
+    /// Teach Klar the words whisper gets wrong, and check that it learned.
+    #[command(subcommand)]
+    Dict(DictCommand),
+    /// Show what has been dictated on this machine.
+    History(HistoryArgs),
+    /// Totals, per day and overall.
+    Stats(StatsArgs),
     /// Drive the state machine through one dictation with canned text.
     DryRun,
+}
+
+#[derive(Subcommand)]
+enum DictCommand {
+    /// Teach a word. Repeating a term replaces what it sounds like.
+    Add {
+        /// The spelling you want to see.
+        term: String,
+        /// What whisper produces instead. Repeat for each shape it takes.
+        #[arg(long = "sounds-like", required = true)]
+        sounds_like: Vec<String>,
+    },
+    /// Show every taught word.
+    List,
+    /// Switch a term off without losing what it sounds like.
+    Disable { id: i64 },
+    /// Switch a term back on.
+    Enable { id: i64 },
+    /// Forget a term.
+    Remove { id: i64 },
+    /// Run the substitution over a line of text. No model, no microphone —
+    /// this is how you check a new entry before speaking into it.
+    Try { text: String },
+    /// Print the prompt the dictionary contributes to whisper.
+    Prompt,
+}
+
+#[derive(clap::Args)]
+struct HistoryArgs {
+    #[arg(long, default_value_t = 20)]
+    limit: u32,
+    /// Show what whisper produced before the dictionary and polish touched it.
+    #[arg(long)]
+    raw: bool,
+    /// Delete every dictation. The totals survive; `stats --clear` erases those.
+    #[arg(long)]
+    clear: bool,
+}
+
+#[derive(clap::Args)]
+struct StatsArgs {
+    /// How many days to break out.
+    #[arg(long, default_value_t = 7)]
+    days: u32,
+    /// Words per minute you type, for the time-saved line.
+    #[arg(long, default_value_t = 40.0)]
+    wpm: f32,
+    /// Erase the totals.
+    #[arg(long)]
+    clear: bool,
 }
 
 #[derive(clap::Args)]
@@ -251,6 +309,9 @@ async fn main() -> Result<()> {
         Command::Hotkey => hotkey(),
         Command::Dictate(args) => dictate(&args),
         Command::Model(command) => model_command(command).await,
+        Command::Dict(command) => dict_command(command),
+        Command::History(args) => history(&args),
+        Command::Stats(args) => stats(&args),
         Command::DryRun => dry_run(),
     }
 }
@@ -776,8 +837,23 @@ fn dictate(args: &DictateArgs) -> Result<()> {
 
     println!("ready. hold {binding:?}, speak, release. Ctrl+C to stop.");
 
+    // Opened once and read per dictation: an edit made in another window while
+    // this is running should take effect on the very next sentence, and the
+    // read is a handful of rows.
+    let mut store = store()?;
+    let dictionary = store.dictionary()?;
+    if let Some((prompt, dropped)) = dictionary.prompt() {
+        println!("dictionary    {prompt}");
+        if dropped > 0 {
+            println!("              ({dropped} term(s) over whisper's prompt limit)");
+        }
+    }
+
     let options = TranscribeOptions {
         language: args.language.clone(),
+        // Biases recognition toward the taught words before anything is
+        // decoded. The substitution below catches what this misses.
+        initial_prompt: dictionary.prompt().map(|(prompt, _)| prompt),
         ..TranscribeOptions::default()
     };
     let config = StreamConfig {
@@ -862,17 +938,30 @@ fn dictate(args: &DictateArgs) -> Result<()> {
         }
         capture.stop();
 
-        let (text, stats) = stream.finish()?;
+        let (raw_text, stats) = stream.finish()?;
         print!("\r{:<78}\r", "");
 
         let Some(released) = released else { break };
 
-        if text.is_empty() {
+        if raw_text.is_empty() {
             println!("no speech recognised");
             continue;
         }
 
+        // Read fresh, so a term taught in another terminal a moment ago works
+        // on this dictation rather than the next run.
+        let text = match store.dictionary() {
+            Ok(dictionary) => dictionary.apply(&raw_text),
+            Err(error) => {
+                println!("(dictionary unavailable: {error})");
+                raw_text.clone()
+            }
+        };
+
         println!("{text}");
+        if text != raw_text {
+            println!("  was  {raw_text}");
+        }
 
         if args.dry {
             report(&stats, None, released, &mut timings);
@@ -887,6 +976,20 @@ fn dictate(args: &DictateArgs) -> Result<()> {
             released,
             &mut timings,
         );
+
+        let recorded = store.record(&NewDictation {
+            text: text.clone(),
+            raw: raw_text,
+            audio_ms: (stats.committed_audio + stats.tail_audio).as_millis() as u64,
+            latency_ms: released.elapsed().as_millis() as u64,
+            target: None,
+            polished: false,
+        });
+        if let Err(error) = recorded {
+            // The words already landed. Losing the history row is a footnote,
+            // not a failure worth stopping the loop over.
+            println!("(not recorded: {error})");
+        }
     }
 
     Ok(())
@@ -1034,6 +1137,177 @@ fn models_dir() -> Result<PathBuf> {
         return Ok(PathBuf::from(dir));
     }
     model::models_dir().context("could not determine the app data directory")
+}
+
+/// The same database the app uses, unless `KLAR_DB` says otherwise.
+fn store() -> Result<Store> {
+    let path =
+        klar_core::store::default_path().context("could not determine the app data directory")?;
+    Store::open(&path).with_context(|| format!("opening {}", path.display()))
+}
+
+fn dict_command(command: DictCommand) -> Result<()> {
+    let store = store()?;
+
+    match command {
+        DictCommand::Add { term, sounds_like } => {
+            let id = store.teach(&term, &sounds_like)?;
+            println!("{id:>4}  {term}  ←  {}", sounds_like.join(", "));
+        }
+
+        DictCommand::List => {
+            let dictionary = store.dictionary()?;
+            if dictionary.entries().is_empty() {
+                println!(
+                    "nothing taught yet — klar-cli dict add <term> --sounds-like <what you get>"
+                );
+                return Ok(());
+            }
+            for entry in dictionary.entries() {
+                let id = entry.id.unwrap_or_default();
+                let mark = if entry.enabled { " " } else { "-" };
+                println!(
+                    "{id:>4} {mark} {}  ←  {}",
+                    entry.term,
+                    entry.replacements.join(", ")
+                );
+            }
+        }
+
+        DictCommand::Disable { id } => {
+            store.set_term_enabled(id, false)?;
+            println!("{id} off");
+        }
+
+        DictCommand::Enable { id } => {
+            store.set_term_enabled(id, true)?;
+            println!("{id} on");
+        }
+
+        DictCommand::Remove { id } => {
+            if store.forget(id)? {
+                println!("{id} forgotten");
+            } else {
+                bail!("no term with id {id}");
+            }
+        }
+
+        DictCommand::Try { text } => {
+            let fixed = store.dictionary()?.apply(&text);
+            println!("in    {text}");
+            println!("out   {fixed}");
+            if fixed == text {
+                println!("      (nothing matched)");
+            }
+        }
+
+        DictCommand::Prompt => match store.dictionary()?.prompt() {
+            Some((prompt, dropped)) => {
+                println!("{prompt}");
+                if dropped > 0 {
+                    println!("({dropped} term(s) did not fit whisper's prompt limit)");
+                }
+            }
+            None => println!("(no prompt — nothing enabled)"),
+        },
+    }
+
+    Ok(())
+}
+
+fn history(args: &HistoryArgs) -> Result<()> {
+    let store = store()?;
+
+    if args.clear {
+        let removed = store.clear_history()?;
+        println!("{removed} dictation(s) deleted. Totals kept — `stats --clear` erases those.");
+        return Ok(());
+    }
+
+    let rows = store.history(args.limit)?;
+    if rows.is_empty() {
+        println!("nothing dictated yet");
+        return Ok(());
+    }
+
+    for row in rows {
+        println!(
+            "{:>5}  {:>5} ms  {:>5} ms audio  {}{}",
+            row.id,
+            row.latency_ms,
+            row.audio_ms,
+            row.target.as_deref().unwrap_or("-"),
+            if row.polished { "  polished" } else { "" }
+        );
+        println!("       {}", row.text);
+        if args.raw && row.raw != row.text {
+            println!("  raw  {}", row.raw);
+        }
+    }
+
+    Ok(())
+}
+
+fn stats(args: &StatsArgs) -> Result<()> {
+    let store = store()?;
+
+    if args.clear {
+        store.clear_stats()?;
+        println!("totals erased");
+        return Ok(());
+    }
+
+    let totals = store.totals()?;
+    if totals.dictations == 0 {
+        println!("nothing dictated yet");
+        return Ok(());
+    }
+
+    println!("dictations  {}", totals.dictations);
+    println!("words       {}", totals.words);
+    println!("days        {}", totals.days);
+    println!(
+        "spoken      {}",
+        duration(Duration::from_millis(totals.audio_ms))
+    );
+
+    // Against typing, not against silence: the honest comparison is how long
+    // these words would have taken to type, minus how long they took to say.
+    let typing = Duration::from_secs_f32(totals.words as f32 / args.wpm.max(1.0) * 60.0);
+    let spoken = Duration::from_millis(totals.audio_ms);
+    match typing.checked_sub(spoken) {
+        Some(saved) => println!(
+            "saved       {} against {:.0} wpm",
+            duration(saved),
+            args.wpm
+        ),
+        None => println!("saved       nothing — you type faster than you talk"),
+    }
+
+    println!();
+    for day in store.daily(args.days)? {
+        println!(
+            "{}  {:>4} dictations  {:>6} words  {}",
+            day.day,
+            day.dictations,
+            day.words,
+            duration(Duration::from_millis(day.audio_ms))
+        );
+    }
+
+    Ok(())
+}
+
+/// Hours and minutes, or minutes and seconds — whichever the number deserves.
+fn duration(of: Duration) -> String {
+    let seconds = of.as_secs();
+    if seconds >= 3_600 {
+        format!("{} h {:02} m", seconds / 3_600, (seconds % 3_600) / 60)
+    } else if seconds >= 60 {
+        format!("{} m {:02} s", seconds / 60, seconds % 60)
+    } else {
+        format!("{seconds} s")
+    }
 }
 
 fn dry_run() -> Result<()> {
