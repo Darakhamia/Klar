@@ -417,7 +417,9 @@ matches nothing as an error, and a CPU build has nothing to match.
 A Vulkan build needs none of this and takes the plain config: the loader,
 `vulkan-1.dll`, is installed by the graphics driver on every machine that has a
 GPU worth using, and the shaders are compiled into the binary at build time.
-That is a quarter of a gigabyte the installer does not carry.
+Measured on the published installers: the CUDA build of 0.1.0 is **383 MiB**,
+the Vulkan build of 0.3.0 is **10.3 MiB**. Almost all of that difference is
+`cublas`, which ships a kernel for every architecture NVIDIA supports.
 
 ### Updates
 
