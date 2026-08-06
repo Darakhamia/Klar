@@ -16,8 +16,10 @@
 //! call a model at all.
 
 pub mod ollama;
+pub mod sidecar;
 
 pub use ollama::{Ollama, OllamaConfig};
+pub use sidecar::{Sidecar, SidecarConfig};
 
 use std::time::Duration;
 
@@ -127,6 +129,19 @@ pub enum PolishError {
     #[error("{0} is not reachable — is the local model server running?")]
     Unreachable(String),
 
+    #[error("the polish model could not be started: {0}")]
+    Unstartable(String),
+
+    /// The child process died, or its pipes did. Distinct from
+    /// [`PolishError::Unstartable`] because it happens to a polisher that was
+    /// working a moment ago, and the answer to it is to start another one.
+    #[error("the polish model stopped: {0}")]
+    Crashed(String),
+
+    /// The model ran and said it could not do the job. Its own words.
+    #[error("the polish model failed: {0}")]
+    Model(String),
+
     #[error("the polish service answered {status}: {body}")]
     Refused { status: u16, body: String },
 
@@ -172,6 +187,11 @@ pub trait TextPolisher: Send {
 pub enum Polisher {
     /// Verbatim. Hands the transcript straight back and touches nothing.
     Noop,
+    /// The model Klar ships, in a child process. What a normal install uses.
+    Sidecar(Box<Sidecar>),
+    /// A model server the user already runs. Not what a normal install uses,
+    /// and kept because it is the only way to polish with something bigger than
+    /// Klar is willing to download on its own.
     Ollama(Ollama),
 }
 
@@ -179,6 +199,7 @@ impl TextPolisher for Polisher {
     async fn polish(&mut self, request: PolishRequest<'_>) -> Result<String, PolishError> {
         match self {
             Self::Noop => Ok(request.text.to_owned()),
+            Self::Sidecar(sidecar) => sidecar.polish(request).await,
             Self::Ollama(ollama) => ollama.polish(request).await,
         }
     }
@@ -186,9 +207,29 @@ impl TextPolisher for Polisher {
     async fn available(&mut self) -> bool {
         match self {
             Self::Noop => true,
+            Self::Sidecar(sidecar) => sidecar.available().await,
             Self::Ollama(ollama) => ollama.available().await,
         }
     }
+}
+
+/// The instructions plus whatever the user has taught Klar to spell.
+///
+/// Shared by every polisher rather than built at each call site: the vocabulary
+/// sentence is part of the prompt's behaviour, and two implementations that
+/// worded it differently would polish differently for reasons no one would
+/// think to look for.
+fn system_prompt(instructions: &str, vocabulary: &[String]) -> String {
+    if vocabulary.is_empty() {
+        return instructions.to_owned();
+    }
+
+    // Names the speaker has taught Klar. Without this a model helpfully
+    // "corrects" them, which is the opposite of the dictionary's job.
+    format!(
+        "{instructions}\nThese words are spelled correctly and must not be changed: {}.",
+        vocabulary.join(", ")
+    )
 }
 
 /// Decide whether a polished result is a cleaned-up transcript or something

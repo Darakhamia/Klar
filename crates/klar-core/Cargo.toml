@@ -20,7 +20,9 @@ coreml = ["whisper-rs/coreml"]
 
 [dependencies]
 thiserror.workspace = true
-tokio.workspace = true
+# process + io-util: the polish sidecar is a child process talked to over its
+# pipes. See `polish::sidecar`.
+tokio = { workspace = true, features = ["process", "io-util"] }
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -31,6 +33,10 @@ rubato = "4.0.0"
 # accelerators this binary actually carries.
 whisper-rs = { version = "0.16.0", features = ["tracing_backend", "raw-api"] }
 hound = "3.5.1"
+
+# The wire types the polish sidecar speaks, and nothing else: llama.cpp sits
+# behind that crate's `engine` feature, which this dependency does not enable.
+klar-llm = { path = "../klar-llm" }
 
 reqwest = { version = "0.13.4", default-features = false, features = [
     "rustls",

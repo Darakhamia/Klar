@@ -143,16 +143,7 @@ impl TextPolisher for Ollama {
             return Ok(request.text.to_owned());
         };
 
-        let system = if request.vocabulary.is_empty() {
-            instructions.to_owned()
-        } else {
-            // Names the speaker has taught Klar. Without this a model helpfully
-            // "corrects" them, which is the opposite of the dictionary's job.
-            format!(
-                "{instructions}\nThese words are spelled correctly and must not be changed: {}.",
-                request.vocabulary.join(", ")
-            )
-        };
+        let system = super::system_prompt(instructions, request.vocabulary);
 
         let body = serde_json::json!({
             "model": self.config.model,
