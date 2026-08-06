@@ -58,7 +58,7 @@
       "endpoints": [
         "https://klar.app/updates/latest.json"
       ],
-      "pubkey": ""
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGNjg3MTIwMjg0M0MzMkIKUldRcncwTW9JSEZvUHg1L3Z0R1AwN3BoRGJ5aTV2Y2FkNzNES202dE5jR0RWZmh6V0VwbENIdDEK"
     }
   },
   "bundle": {
