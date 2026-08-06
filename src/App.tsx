@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ENGINE_EVENT,
+  SECTION_EVENT,
   appVersion,
   inShell,
   note,
@@ -96,6 +97,16 @@ export function App() {
         setError(message);
       },
     );
+  }, []);
+
+  // The tray can ask for a pane. Without this, "Update to 0.3.2…" opens a
+  // window still showing whichever section it was left on weeks ago, and the
+  // thing the user clicked for is three panes away.
+  useEffect(() => {
+    if (!inShell()) return;
+    return subscribe<string>(SECTION_EVENT, (asked) => {
+      if ((SECTIONS as readonly string[]).includes(asked)) setSection(asked as Section);
+    });
   }, []);
 
   // A rebind is already saved and applied by the time it answers, so this only

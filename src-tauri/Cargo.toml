@@ -46,3 +46,6 @@ directories.workspace = true
 parking_lot.workspace = true
 tauri-plugin-updater = { version = "2.10.1", default-features = false, features = ["rustls-tls"] }
 tauri-plugin-process = "2.3.1"
+# One notification, once per new version. Sent from Rust, so the frontend needs
+# no permission for it and cannot send one.
+tauri-plugin-notification = "2.3.3"

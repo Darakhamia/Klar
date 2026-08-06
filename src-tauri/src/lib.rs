@@ -38,6 +38,9 @@ pub fn run() {
         // reports that itself, and `updates::check` turns it into a sentence
         // rather than the app failing to start over a missing key.
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Klar sends exactly one kind of notification, from Rust, when a new
+        // version appears. The frontend is given no permission for it.
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             commands::app_version,
             commands::acceleration,

@@ -255,6 +255,24 @@ function Updates({
       });
   };
 
+  // Ask when the pane appears, so somebody arriving here from the tray's
+  // "Update to 0.3.2…" finds the update rather than a button offering to look
+  // for it. Silent: a failure here is a row that says nothing, which is what it
+  // said before. Only when the user has left checking on — with it off, this
+  // row must not reach the network at all.
+  useEffect(() => {
+    if (!settings.checkForUpdates) return;
+    let cancelled = false;
+    checkForUpdate()
+      .then((available) => {
+        if (!cancelled && available) setFound(available);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.checkForUpdates]);
+
   return (
     <Row
       label="Updates"

@@ -60,6 +60,10 @@ export type EngineEvent =
 
 export const ENGINE_EVENT = "klar://event";
 
+/** The tray asking the settings window for a pane. Mirrors `SECTION_EVENT` in
+ * `src-tauri/src/tray.rs`; the payload is a section name. */
+export const SECTION_EVENT = "klar://section";
+
 /** Download progress, mirroring `DownloadEvent` in
  * `src-tauri/src/downloads.rs`. */
 export type ModelEvent =

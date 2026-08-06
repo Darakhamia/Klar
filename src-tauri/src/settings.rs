@@ -176,7 +176,15 @@ impl Settings {
     }
 }
 
-fn path() -> Option<PathBuf> {
+/// Where Klar keeps what the user has chosen.
+///
+/// `None` on a machine with no home directory, which is a state the app cannot
+/// do anything about and so never treats as an error — it runs on defaults.
+pub fn config_dir() -> Option<PathBuf> {
     directories::ProjectDirs::from("app", "Klar", "Klar")
-        .map(|dirs| dirs.config_local_dir().join("settings.json"))
+        .map(|dirs| dirs.config_local_dir().to_path_buf())
+}
+
+fn path() -> Option<PathBuf> {
+    config_dir().map(|dir| dir.join("settings.json"))
 }

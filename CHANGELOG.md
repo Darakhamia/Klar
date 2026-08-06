@@ -13,6 +13,36 @@ Newest first.
 
 ---
 
+## 0.3.2
+
+**Klar now tells you when there is a new version.** It has been checking since
+0.3.0 and announcing the result by changing the tray icon's tooltip, which is
+read by somebody already hovering over the icon wondering — and nobody hovers
+over a tray icon wondering. The update reached no one.
+
+Two places instead. The tray menu gains "Update to 0.3.3…" at the top for as
+long as that is true, and clicking it opens Settings on General with the notes
+and the button. It opens rather than installs on purpose: installing restarts
+Klar, and doing that straight off a menu click would take the hotkey out from
+under somebody mid-sentence.
+
+And one desktop notification, the first time each version is seen. Once per
+version, not once per launch — the check runs at every startup, and a toast
+every morning is how an app teaches people to dismiss it unread.
+
+The Updates row also checks by itself when you open it, so arriving there from
+the tray finds the update rather than a button offering to look for one. It
+stays silent when checking is switched off; with that off, nothing here touches
+the network.
+
+Release notes are shown at all now. They travelled from the changelog into the
+manifest, across the network and into the app, and were then dropped in the one
+row with space for them — leaving "what changed?" answered by a version number.
+They also arrived as mojibake, because the release script read `CHANGELOG.md`
+with Windows PowerShell's ANSI default. Both fixed.
+
+---
+
 ## 0.3.1
 
 **Recognition accuracy is now a setting.** Settings → Voice → Recognition

@@ -22,7 +22,9 @@
 //! — and it is what stops the update channel itself from being a way in.
 
 use serde::Serialize;
+use std::path::PathBuf;
 use tauri::AppHandle;
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 
 /// A newer version, when there is one.
@@ -87,10 +89,9 @@ pub async fn install(app: &AppHandle) -> Result<(), String> {
 
 /// Ask once, in the background, at startup.
 ///
-/// Its own task so it cannot delay the tray, the window or the engine, and it
-/// reports what it finds by changing the tray tooltip — the quietest place that
-/// is always visible. A failure is logged and nothing else: somebody starting a
-/// dictation app has not asked to hear about the network.
+/// Its own task so it cannot delay the tray, the window or the engine. A
+/// failure is logged and nothing else: somebody starting a dictation app has
+/// not asked to hear about the network.
 pub fn check_in_background(app: &AppHandle) {
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -101,12 +102,95 @@ pub fn check_in_background(app: &AppHandle) {
                     current = %available.current,
                     "an update is available"
                 );
-                crate::tray::announce_update(&handle, &available.version);
+                announce(&handle, &available);
             }
             Ok(None) => tracing::info!("klar is up to date"),
             Err(error) => tracing::info!(%error, "could not check for updates"),
         }
     });
+}
+
+/// Tell the user, in the two places that reach somebody who is not looking.
+///
+/// The tray menu carries it for as long as it is true. The notification is the
+/// part that gets noticed, and it is fired **once per version**: the check runs
+/// at every startup, so without that it would be a toast every launch until the
+/// user gave in, which is how an app teaches people to dismiss it unread. The
+/// version last announced is remembered on disk beside the settings.
+fn announce(app: &AppHandle, available: &Available) {
+    crate::tray::announce_update(app, &available.version);
+
+    if announced() == Some(available.version.clone()) {
+        tracing::debug!(version = %available.version, "already announced; menu only");
+        return;
+    }
+
+    let body = match available.notes.as_deref() {
+        // The manifest's notes, trimmed to what a toast will show before the
+        // system cuts it off mid-word.
+        Some(notes) if !notes.trim().is_empty() => shorten(notes, 180),
+        None | Some(_) => "Open Klar's settings to install it.".to_owned(),
+    };
+
+    match app
+        .notification()
+        .builder()
+        .title(format!("Klar {} is available", available.version))
+        .body(body)
+        .show()
+    {
+        // Only after it was actually shown. A toast that failed — no Start menu
+        // shortcut to hang the app identity on, a user who has notifications
+        // switched off at the OS level — should be retried next launch rather
+        // than counted as delivered.
+        Ok(()) => remember(&available.version),
+        Err(error) => tracing::warn!(%error, "could not show the update notification"),
+    }
+}
+
+/// Cut on a word boundary, so the last thing the user reads is a word.
+fn shorten(text: &str, limit: usize) -> String {
+    let text = text.trim();
+    if text.chars().count() <= limit {
+        return text.to_owned();
+    }
+
+    let cut: String = text.chars().take(limit).collect();
+    let end = cut.rfind(' ').unwrap_or(cut.len());
+    format!("{}…", cut[..end].trim_end_matches(['.', ',', ' ']))
+}
+
+/// The file holding the last version we sent a notification about.
+///
+/// Deliberately not a field in `Settings`: that struct is mirrored in
+/// TypeScript and round-tripped through the settings window, so a field the
+/// frontend does not know about is a field the next save silently drops.
+fn announced_path() -> Option<PathBuf> {
+    crate::settings::config_dir().map(|dir| dir.join("announced-version"))
+}
+
+fn announced() -> Option<String> {
+    let path = announced_path()?;
+    std::fs::read_to_string(path)
+        .ok()
+        .map(|text| text.trim().to_owned())
+}
+
+fn remember(version: &str) {
+    let Some(path) = announced_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent()
+        && let Err(error) = std::fs::create_dir_all(parent)
+    {
+        tracing::warn!(%error, "could not create the config directory");
+        return;
+    }
+    // Failing here costs one repeated notification at the next launch and
+    // nothing else, so it is a warning rather than anything louder.
+    if let Err(error) = std::fs::write(&path, version) {
+        tracing::warn!(%error, path = %path.display(), "could not record the announced version");
+    }
 }
 
 /// Turn the plugin's errors into something a person can act on.
@@ -123,4 +207,43 @@ fn describe(error: tauri_plugin_updater::Error) -> String {
     }
 
     format!("Could not reach the update server: {text}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_notes_are_left_alone() {
+        assert_eq!(shorten("Two words.", 180), "Two words.");
+    }
+
+    #[test]
+    fn long_notes_end_on_a_word() {
+        let notes = "Recognition accuracy is now a setting, and this sentence carries on well past the limit so that the cut has somewhere to land.";
+        let short = shorten(notes, 40);
+        assert!(short.ends_with('…'), "{short}");
+        assert!(short.chars().count() <= 41, "{short}");
+        assert!(!short.contains(" …"), "cut mid-space: {short}");
+        assert!(
+            notes.starts_with(short.trim_end_matches(['…', ' '])),
+            "{short}"
+        );
+    }
+
+    /// The notes are UTF-8 from a manifest we do not control. Counting bytes
+    /// rather than characters would panic on a cut through a multi-byte one,
+    /// inside the startup task, in a background app.
+    #[test]
+    fn a_cut_through_multibyte_text_does_not_panic() {
+        let notes =
+            "Настройки — Голос — Распознавание выбирает между быстрым и точным режимом работы";
+        let short = shorten(notes, 20);
+        assert!(short.chars().count() <= 21, "{short}");
+    }
+
+    #[test]
+    fn whitespace_only_notes_shorten_to_nothing_rather_than_panicking() {
+        assert_eq!(shorten("   \n  ", 180), "");
+    }
 }
