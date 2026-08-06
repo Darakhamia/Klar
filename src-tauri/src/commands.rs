@@ -27,6 +27,117 @@ pub fn app_version() -> AppVersion {
     }
 }
 
+/// The window's connection to the database.
+///
+/// Separate from the engine's, which opens its own. SQLite in WAL mode lets a
+/// reader and a writer coexist, so a history query cannot delay the write at
+/// the end of a dictation — and the alternative, one connection behind a lock
+/// shared with the audio thread, could.
+///
+/// `None` when the file could not be opened. Every command below then reports
+/// that rather than the app failing to start: a Klar that dictates and cannot
+/// remember is worth more than one that will not run.
+pub struct Db(pub Mutex<Option<klar_core::Store>>);
+
+impl Db {
+    pub fn open() -> Self {
+        let store =
+            klar_core::store::default_path().and_then(|path| match klar_core::Store::open(&path) {
+                Ok(store) => Some(store),
+                Err(error) => {
+                    tracing::error!(%error, "could not open the database");
+                    None
+                }
+            });
+        Self(Mutex::new(store))
+    }
+}
+
+/// Run `f` against the database, or report that there is not one.
+fn with_db<T>(
+    db: &State<'_, Db>,
+    f: impl FnOnce(&mut klar_core::Store) -> Result<T, klar_core::store::StoreError>,
+) -> Result<T, String> {
+    let mut guard = db.0.lock();
+    let store = guard.as_mut().ok_or(
+        "Klar could not open its database, so the dictionary and history are unavailable. \
+         The log says why — Settings → Diagnostics.",
+    )?;
+    f(store).map_err(|error| error.to_string())
+}
+
+/// Every taught word, enabled or not.
+#[tauri::command]
+pub fn dictionary(db: State<'_, Db>) -> Result<Vec<klar_core::Entry>, String> {
+    with_db(&db, |store| Ok(store.dictionary()?.entries().to_vec()))
+}
+
+/// Teach a word, or correct one already taught.
+#[tauri::command]
+pub fn dictionary_teach(
+    db: State<'_, Db>,
+    term: String,
+    replacements: Vec<String>,
+) -> Result<i64, String> {
+    with_db(&db, |store| store.teach(&term, &replacements))
+}
+
+#[tauri::command]
+pub fn dictionary_set_enabled(db: State<'_, Db>, id: i64, enabled: bool) -> Result<(), String> {
+    with_db(&db, |store| store.set_term_enabled(id, enabled))
+}
+
+#[tauri::command]
+pub fn dictionary_forget(db: State<'_, Db>, id: i64) -> Result<bool, String> {
+    with_db(&db, |store| store.forget(id))
+}
+
+/// What the dictionary would do to a line of text.
+///
+/// The editor shows this live, because the rules — whole words, longest phrase
+/// first, case-insensitive — are easier to see working once than to explain.
+#[tauri::command]
+pub fn dictionary_try(db: State<'_, Db>, text: String) -> Result<String, String> {
+    with_db(&db, |store| Ok(store.dictionary()?.apply(&text)))
+}
+
+#[tauri::command]
+pub fn history(db: State<'_, Db>, limit: u32) -> Result<Vec<klar_core::store::Dictation>, String> {
+    with_db(&db, |store| store.history(limit))
+}
+
+#[tauri::command]
+pub fn history_clear(db: State<'_, Db>) -> Result<u64, String> {
+    with_db(&db, |store| store.clear_history())
+}
+
+#[tauri::command]
+pub fn dictation_forget(db: State<'_, Db>, id: i64) -> Result<bool, String> {
+    with_db(&db, |store| store.forget_dictation(id))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatsReport {
+    totals: klar_core::store::Totals,
+    daily: Vec<klar_core::store::DayStat>,
+}
+
+#[tauri::command]
+pub fn stats(db: State<'_, Db>, days: u32) -> Result<StatsReport, String> {
+    with_db(&db, |store| {
+        Ok(StatsReport {
+            totals: store.totals()?,
+            daily: store.daily(days)?,
+        })
+    })
+}
+
+#[tauri::command]
+pub fn stats_clear(db: State<'_, Db>) -> Result<(), String> {
+    with_db(&db, |store| store.clear_stats())
+}
+
 /// Which device speech is recognised on, and what is wrong if it is the CPU.
 ///
 /// The interface asks because the answer is the difference between Klar being

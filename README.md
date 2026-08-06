@@ -19,8 +19,16 @@ onboarding all work. The polish stage is built and **off by default** — it nee
 a local model server, and dictation without it inserts the transcript as
 recognised.
 
-Not built: the dictionary, history and statistics, which need the database in
-M5, and the cloud path for machines without a usable GPU. Both say so in the
+**Dictionary, history and statistics work.** Teach Klar a name it mangles and it
+spells it correctly from the next sentence on — biased into whisper's prompt
+before decoding, and substituted afterwards for whatever the bias missed. The
+editor previews the substitution live, so a new entry can be checked without
+holding the hotkey and hoping. Every dictation is recorded locally, labelled
+with the application it went into, and deleting is per row or all at once. The
+totals survive clearing the history: the text is the private part, how much you
+used the app is not.
+
+Not built: the cloud path for machines without a usable GPU. It says so in the
 interface rather than being offered and doing nothing.
 
 **Not only NVIDIA.** The GPU backend is a compile-time choice, so there is a
@@ -266,6 +274,29 @@ cargo run -p klar-cli --features cuda -- dictate    # the whole loop
 release, and the text lands at the cursor in whatever is focused. It prints the
 time from key-up to inserted text, which is the number CLAUDE.md's budget is
 about.
+
+### The dictionary
+
+Whisper mangles names it has never seen, and it mangles them the same way every
+time — which is what makes it fixable.
+
+```sh
+cargo run -p klar-cli -- dict add Anthropic --sounds-like anthropik \
+  --sounds-like "and thropic"
+cargo run -p klar-cli -- dict try "I work at anthropik on analysis"
+#   in    I work at anthropik on analysis
+#   out   I work at Anthropic on analysis
+```
+
+`dict try` needs no model and no microphone, which is the point: an entry can be
+checked against a sentence before speaking into it. `dict list|enable|disable|remove`
+and `dict prompt` — what the dictionary contributes to whisper before decoding
+— round it out.
+
+`history` and `stats` show what has been dictated on this machine.
+`history --clear` deletes the text and keeps the totals; `stats --clear` erases
+those separately, because "forget what I said" and "forget that I was here" are
+different requests.
 
 Other commands: `devices`, `record --seconds 5 --out debug.wav`,
 `transcribe file.wav`, `model list|verify`, `dry-run`.

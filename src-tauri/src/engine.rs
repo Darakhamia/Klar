@@ -9,6 +9,7 @@ use crate::settings::FinishAction;
 use klar_core::asr::{TranscribeOptions, WhisperTranscriber};
 use klar_core::audio::{self, BlockConverter, Capture, CaptureConfig};
 use klar_core::polish::{OllamaConfig, PolishRequest, Polisher, Strength, TextPolisher};
+use klar_core::store::{NewDictation, Store, StoreError};
 use klar_core::stream::{Stream, StreamConfig, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
 use klar_core::{Input, Machine, State, StateEvent, model};
@@ -231,9 +232,25 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
     );
     emit(app, UiEvent::State { state: State::Idle });
 
-    let options = TranscribeOptions {
-        language: config.language.clone(),
-        ..TranscribeOptions::default()
+    // Its own connection rather than sharing the one the settings window uses:
+    // SQLite in WAL mode is built for exactly this, and it keeps a history
+    // query in the interface from ever being in the way of the write at the end
+    // of a dictation.
+    //
+    // A database that will not open costs the dictionary and the history, and
+    // nothing else. Dictation is the product; both of those are features of it.
+    let mut store = match klar_core::store::default_path() {
+        Some(path) => match Store::open(&path) {
+            Ok(store) => Some(store),
+            Err(error) => {
+                tracing::error!(%error, "no database: the dictionary and history are unavailable");
+                None
+            }
+        },
+        None => {
+            tracing::error!("no app data directory: the dictionary and history are unavailable");
+            None
+        }
     };
 
     while !stop.load(Ordering::SeqCst) {
@@ -242,7 +259,7 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
                 let outcome = dictate(
                     app,
                     config,
-                    &options,
+                    store.as_mut(),
                     &mut transcriber,
                     &mut vad,
                     &mut polisher,
@@ -277,7 +294,7 @@ fn run(app: &AppHandle, config: &EngineConfig, stop: &AtomicBool) -> Result<(), 
 fn dictate(
     app: &AppHandle,
     config: &EngineConfig,
-    options: &TranscribeOptions,
+    store: Option<&mut Store>,
     transcriber: &mut WhisperTranscriber,
     vad: &mut StreamingVad,
     polisher: &mut Polisher,
@@ -289,12 +306,34 @@ fn dictate(
     let mut machine = Machine::new();
     apply(app, &mut machine, Input::Start);
 
+    // Read per dictation, not once at startup: a word taught in the settings
+    // window has to work on the very next sentence, which is the only moment
+    // the user will think to test it. A few rows against a pipeline that is
+    // about to run an encoder pass.
+    let dictionary = store
+        .as_ref()
+        .map(|store| store.dictionary())
+        .transpose()
+        .unwrap_or_else(|error: StoreError| {
+            tracing::warn!(%error, "could not read the dictionary");
+            None
+        })
+        .unwrap_or_default();
+
+    let options = TranscribeOptions {
+        language: config.language.clone(),
+        // Biases recognition toward the taught words before anything is
+        // decoded; `Dictionary::apply` below fixes what this misses.
+        initial_prompt: dictionary.prompt().map(|(prompt, _)| prompt),
+        ..TranscribeOptions::default()
+    };
+
     let capture_config = CaptureConfig {
         device: config.device.clone(),
     };
     let (capture, audio_rx) = Capture::start(&capture_config).map_err(|e| e.to_string())?;
     let mut converter = BlockConverter::new(capture.format(), Duration::from_millis(250));
-    let mut stream = Stream::new(transcriber, vad, options.clone(), config.stream);
+    let mut stream = Stream::new(transcriber, vad, options, config.stream);
 
     let mut raw = Vec::new();
     let mut level_at = Instant::now();
@@ -348,6 +387,8 @@ fn dictate(
         }
     }
 
+    // The clock the latency budget is measured against starts here.
+    let released = Instant::now();
     apply(app, &mut machine, Input::Stop);
 
     let tail = converter.flush().map_err(|e| e.to_string())?;
@@ -356,13 +397,19 @@ fn dictate(
     }
     capture.stop();
 
-    let (text, stats) = stream.finish().map_err(|e| e.to_string())?;
-    if text.is_empty() {
+    let (raw, stats) = stream.finish().map_err(|e| e.to_string())?;
+    if raw.is_empty() {
         // Nothing said. Not an error, and not worth an overlay full of nothing.
         apply(app, &mut machine, Input::Fail("no speech".into()));
         apply(app, &mut machine, Input::Dismiss);
         return Ok(());
     }
+
+    // Before polish rather than after: a language model handed a mangled name
+    // will confidently tidy it into a different mangled name, and the polish
+    // prompts forbid inventing words the speaker did not say. Correct the name
+    // first and the model sees what was meant.
+    let text = dictionary.apply(&raw);
 
     apply(app, &mut machine, Input::Transcribed(text.clone()));
     emit(
@@ -388,7 +435,12 @@ fn dictate(
         );
     }
 
+    // Asked before injecting: the paste is about to change what has focus in
+    // some applications, and the answer wanted is where the text was aimed.
+    let target = klar_platform::foreground_app();
+
     let delivered = deliver(&polished, config.finish, injector).map_err(|e| e.to_string())?;
+    let latency_ms = released.elapsed().as_millis() as u64;
 
     tracing::info!(
         method = ?delivered,
@@ -397,9 +449,29 @@ fn dictate(
         commits = stats.commits,
         tail_ms = stats.tail_elapsed.as_millis() as u64,
         polish_ms,
+        latency_ms,
+        target = target.as_deref().unwrap_or("-"),
         "dictation delivered"
     );
     apply(app, &mut machine, Input::Injected);
+
+    // Last, and never fatal. The words are already in the user's document; a
+    // history row that did not save is worth a line in the log and nothing
+    // more.
+    if let Some(store) = store {
+        let recorded = store.record(&NewDictation {
+            text: polished,
+            raw,
+            audio_ms: (stats.committed_audio + stats.tail_audio).as_millis() as u64,
+            latency_ms,
+            target,
+            polished: config.cleanup != Strength::Verbatim,
+        });
+        if let Err(error) = recorded {
+            tracing::warn!(%error, "could not record the dictation");
+        }
+    }
+
     Ok(())
 }
 

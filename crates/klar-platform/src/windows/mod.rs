@@ -16,6 +16,7 @@ mod inject;
 mod keys;
 
 pub use autostart::{launch_at_login, set_launch_at_login};
+pub use elevation::foreground_app;
 pub use hotkey::suspend;
 pub use keys::key_from_browser_code;
 

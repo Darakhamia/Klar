@@ -82,6 +82,27 @@ Dictionary applies in two places: user terms are injected into the whisper initi
 
 **Done when:** a dictionary entry for a name whisper reliably mangles produces the correct spelling end to end.
 
+Built. Three tables, and `daily_stats` is a real one rather than a query over
+`dictations`, so clearing the history does not also erase how much somebody has
+used the app — the text is the private part, the totals are not. `clear_history`
+VACUUMs, because otherwise "cleared" would mean "not shown".
+
+The dictionary applies in both places the plan asks for, and the substitution is
+the half worth being careful about: whole words only, longest phrase first,
+case-insensitive, and Unicode-aware, because a naive replace turns *analysis*
+into *Anasis* for anyone who taught it a name like Ana. Both failures are tests.
+
+It runs before the polish stage, not after. A language model handed a mangled
+name tidies it confidently into a different mangled name, and the prompts
+already forbid inventing words the speaker did not say.
+
+The dictionary is re-read on every dictation rather than held from startup, so a
+word taught in the settings window works on the very next sentence — which is
+the only moment anybody will think to test it.
+
+**Not yet verified against the criterion**, which is about a name whisper
+mangles *reliably*. That needs somebody's real name and a microphone.
+
 ---
 
 ## M6 — Interface

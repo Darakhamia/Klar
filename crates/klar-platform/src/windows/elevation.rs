@@ -10,7 +10,8 @@ use windows::Win32::Security::{
     GetTokenInformation, TOKEN_MANDATORY_LABEL, TOKEN_QUERY, TokenIntegrityLevel,
 };
 use windows::Win32::System::Threading::{
-    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
 
@@ -69,6 +70,61 @@ pub fn foreground_target() -> Target {
         (Some(_), Some(_)) => Target::Reachable,
         _ => Target::Unknown,
     }
+}
+
+/// The name of the focused application, for labelling a dictation in the
+/// history. `notepad.exe` comes back as `Notepad`.
+///
+/// Every failure is `None`. A protected process will not answer, a process
+/// running as another user will not answer, and neither is worth an error on a
+/// dictation that already landed correctly.
+pub fn foreground_app() -> Option<String> {
+    // SAFETY: no arguments; returns null when nothing is focused.
+    let window = unsafe { GetForegroundWindow() };
+    if window.is_invalid() {
+        return None;
+    }
+
+    let mut pid = 0_u32;
+    // SAFETY: `window` is a valid HWND and `pid` is a valid out-pointer.
+    unsafe { GetWindowThreadProcessId(window, Some(&raw mut pid)) };
+    if pid == 0 {
+        return None;
+    }
+
+    // SAFETY: the most limited query right there is; an elevated or protected
+    // target simply refuses, which is one of the `None` cases.
+    let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) }.ok()?;
+
+    let mut buffer = [0_u16; 260];
+    let mut length = buffer.len() as u32;
+    // SAFETY: `buffer` is `length` wide characters and both pointers are valid
+    // for the call. On success `length` is set to the characters written.
+    let queried = unsafe {
+        QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            windows::core::PWSTR(buffer.as_mut_ptr()),
+            &raw mut length,
+        )
+    };
+
+    // SAFETY: closing a handle we opened, exactly once.
+    let _ = unsafe { CloseHandle(process) };
+    queried.ok()?;
+
+    let path = String::from_utf16_lossy(&buffer[..length as usize]);
+    let stem = std::path::Path::new(&path).file_stem()?.to_str()?;
+    if stem.is_empty() {
+        return None;
+    }
+
+    // `notepad` reads better than `notepad.exe` in a list, and capitalising the
+    // first letter covers the majority of Windows executables, whose names are
+    // lowercase where the application's is not.
+    let mut chars = stem.chars();
+    let first = chars.next()?;
+    Some(first.to_uppercase().collect::<String>() + chars.as_str())
 }
 
 /// The mandatory integrity level of a process, as the RID of its integrity SID.

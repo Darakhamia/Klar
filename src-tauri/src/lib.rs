@@ -36,6 +36,16 @@ pub fn run() {
             commands::app_version,
             commands::acceleration,
             commands::default_hotkey,
+            commands::dictionary,
+            commands::dictionary_teach,
+            commands::dictionary_set_enabled,
+            commands::dictionary_forget,
+            commands::dictionary_try,
+            commands::history,
+            commands::history_clear,
+            commands::dictation_forget,
+            commands::stats,
+            commands::stats_clear,
             commands::permission_states,
             commands::audio_devices,
             commands::models,
@@ -62,6 +72,7 @@ pub fn run() {
 
             app.manage(Running(Mutex::new(None)));
             app.manage(commands::Microphone::default());
+            app.manage(commands::Db::open());
             app.manage(downloads::Active::default());
 
             let settings = Settings::load();

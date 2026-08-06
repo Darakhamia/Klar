@@ -106,6 +106,17 @@ pub fn copy_to_clipboard(text: &str) -> Result<(), PlatformError> {
     backend::copy_to_clipboard(text)
 }
 
+/// The name of the application currently focused, when the OS will say.
+///
+/// Used to label a dictation in the history — "this one went into Slack" —
+/// which is the only thing that makes a list of one's own sentences navigable.
+/// `None` is ordinary: nothing focused, a protected process, or a platform
+/// where this is not built. It is never an error, because a dictation that
+/// worked must not be reported as failed over a label.
+pub fn foreground_app() -> Option<String> {
+    backend::foreground_app()
+}
+
 /// Whether Klar is registered to start when the user logs in.
 pub fn launch_at_login() -> Result<bool, PlatformError> {
     backend::launch_at_login()

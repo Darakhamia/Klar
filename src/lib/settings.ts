@@ -91,6 +91,80 @@ export interface Acceleration {
 
 export const acceleration = (): Promise<Acceleration> => invoke<Acceleration>("acceleration");
 
+/** One taught word. Mirrors `Entry` in `crates/klar-core/src/dictionary.rs`. */
+export interface Entry {
+  id?: number;
+  /** The spelling the user wants to see. */
+  term: string;
+  /** What whisper produces instead. */
+  replacements: string[];
+  enabled: boolean;
+}
+
+export const dictionary = (): Promise<Entry[]> => invoke<Entry[]>("dictionary");
+
+export const teach = (term: string, replacements: string[]): Promise<number> =>
+  invoke<number>("dictionary_teach", { term, replacements });
+
+export const setTermEnabled = (id: number, enabled: boolean): Promise<void> =>
+  invoke<void>("dictionary_set_enabled", { id, enabled });
+
+export const forgetTerm = (id: number): Promise<boolean> =>
+  invoke<boolean>("dictionary_forget", { id });
+
+/** What the dictionary would do to a line of text. The rules — whole words,
+ * longest phrase first, case-insensitive — are easier to see than to read. */
+export const tryDictionary = (text: string): Promise<string> =>
+  invoke<string>("dictionary_try", { text });
+
+/** One recorded dictation. Mirrors `Dictation` in `klar-core::store`. */
+export interface Dictation {
+  id: number;
+  /** Unix seconds. */
+  at: number;
+  text: string;
+  /** What whisper produced, before the dictionary and any polish. */
+  raw: string;
+  audioMs: number;
+  latencyMs: number;
+  target: string | null;
+  polished: boolean;
+}
+
+export const history = (limit: number): Promise<Dictation[]> =>
+  invoke<Dictation[]>("history", { limit });
+
+export const clearHistory = (): Promise<number> => invoke<number>("history_clear");
+
+export const forgetDictation = (id: number): Promise<boolean> =>
+  invoke<boolean>("dictation_forget", { id });
+
+export interface DayStat {
+  day: string;
+  dictations: number;
+  words: number;
+  chars: number;
+  audioMs: number;
+}
+
+export interface Totals {
+  dictations: number;
+  words: number;
+  chars: number;
+  audioMs: number;
+  days: number;
+}
+
+export interface StatsReport {
+  totals: Totals;
+  daily: DayStat[];
+}
+
+export const stats = (days: number): Promise<StatsReport> =>
+  invoke<StatsReport>("stats", { days });
+
+export const clearStats = (): Promise<void> => invoke<void>("stats_clear");
+
 /** The languages worth offering. Whisper knows a hundred; nobody needs a
  * hundred-item menu, and `null` covers everything else by detecting. */
 export const LANGUAGES: { code: string | null; label: string }[] = [

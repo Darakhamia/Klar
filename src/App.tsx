@@ -29,7 +29,9 @@ import {
 import { applyAppearance } from "./lib/theme";
 import { General } from "./sections/General";
 import { Voice } from "./sections/Voice";
-import { DICTIONARY, HISTORY, Pending, STATS } from "./sections/Pending";
+import { Dictionary } from "./sections/Dictionary";
+import { History } from "./sections/History";
+import { Stats } from "./sections/Stats";
 import "./App.css";
 
 const SECTIONS = ["General", "Voice", "Dictionary", "History", "Stats"] as const;
@@ -160,9 +162,9 @@ export function App() {
               onChange={update}
             />
           )}
-          {section === "Dictionary" && <Pending {...DICTIONARY} />}
-          {section === "History" && <Pending {...HISTORY} />}
-          {section === "Stats" && <Pending {...STATS} />}
+          {section === "Dictionary" && <Dictionary />}
+          {section === "History" && <History />}
+          {section === "Stats" && <Stats />}
           {!settings && !error && <p className="panel__error">Reading settings…</p>}
         </div>
       </section>

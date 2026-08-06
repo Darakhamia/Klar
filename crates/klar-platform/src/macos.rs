@@ -47,6 +47,11 @@ pub fn set_launch_at_login(_on: bool) -> Result<(), PlatformError> {
     Err(PlatformError::NotImplemented("SMAppService login item"))
 }
 
+/// Not built. macOS would read this from `NSWorkspace.frontmostApplication`.
+pub fn foreground_app() -> Option<String> {
+    None
+}
+
 /// Nothing to stand down: there is no hook here to suspend.
 pub fn suspend(_suspended: bool) {}
 
