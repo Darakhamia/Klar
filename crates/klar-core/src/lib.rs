@@ -11,13 +11,17 @@
 
 pub mod asr;
 pub mod audio;
+pub mod dictionary;
 pub mod model;
 pub mod polish;
 pub mod state;
+pub mod store;
 pub mod stream;
 pub mod vad;
 
+pub use dictionary::{Dictionary, Entry};
 pub use state::{IllegalTransition, Input, Machine, State, StateEvent};
+pub use store::Store;
 
 /// The version reported by the CLI and the about pane.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
