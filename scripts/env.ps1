@@ -93,15 +93,45 @@ if ($Sign) {
 
     $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $Key -Raw
 
-    # Read rather than take as a parameter: an argument ends up in the shell
-    # history, and this secret cannot be rotated without breaking updates for
-    # every copy already installed.
-    $secure = Read-Host "Updater key password (empty if you set none)" -AsSecureString
-    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD =
-        [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-            [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+    # Check the password here, against a throwaway file, rather than letting the
+    # build find out. Signing happens at the very end of `tauri build`, after
+    # four minutes of compiling and bundling; a typo there costs the whole run
+    # and prints its complaint below the line that says the bundle succeeded,
+    # where it is easy to miss. Signing one byte takes no time at all.
+    $probe = Join-Path $env:TEMP "klar-key-probe.txt"
+    $cli = Join-Path (Split-Path -Parent $PSScriptRoot) "node_modules\@tauri-apps\cli\tauri.js"
 
-    Write-Host "signing   key loaded from $Key"
+    for ($attempt = 1; ; $attempt++) {
+        # Read rather than take as a parameter: an argument ends up in the shell
+        # history, and this secret cannot be rotated without breaking updates
+        # for every copy already installed.
+        $secure = Read-Host "Updater key password (empty if you set none)" -AsSecureString
+        $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD =
+            [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
+                [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
+
+        if (-not (Test-Path $cli)) {
+            Write-Host "signing   key loaded, password NOT checked (no node_modules; run npm install)" -ForegroundColor Yellow
+            break
+        }
+
+        Set-Content -Path $probe -Value "probe" -Encoding ASCII
+        & node $cli signer sign $probe 2>&1 | Out-Null
+        $ok = ($LASTEXITCODE -eq 0)
+        Remove-Item $probe, "$probe.sig" -ErrorAction SilentlyContinue
+
+        if ($ok) {
+            Write-Host "signing   key loaded from $Key, password verified"
+            break
+        }
+
+        $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $null
+        if ($attempt -ge 3) {
+            throw "wrong password three times. The key at $Key is the one 0.3.0 was signed with, so the password does exist and is not empty. Nothing is lost by stopping here; a build without it produces an installer that simply cannot be offered as an update."
+        }
+        Write-Host "wrong password. $((3 - $attempt)) attempts left." -ForegroundColor Yellow
+    }
+
     Write-Host ""
     Write-Host "npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.json"
 }

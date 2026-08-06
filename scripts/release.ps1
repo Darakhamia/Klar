@@ -93,6 +93,22 @@ if (-not (Test-Path $sig)) {
     throw "$name has no .sig beside it, so it cannot be offered as an update. The build needs both the signing key and the release config: . .\scripts\env.ps1 -Sign, then npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.json"
 }
 
+# Existing is not enough: it has to belong to THIS installer. When signing fails
+# -- a mistyped key password is the way -- the bundle is still written and the
+# .sig from the previous build of the same version is still lying beside it.
+# Everything downstream then looks correct: the manifest has a real signature of
+# a real installer, just not of this one. Clients download ten megabytes and
+# refuse it, and the first sign of trouble is on their machine rather than here.
+#
+# Signing is the last step of the bundle, so a good .sig is always the newer
+# file. Nothing more subtle is possible without an Ed25519 verifier, which
+# Windows PowerShell 5.1 does not have.
+$sigWritten = (Get-Item $sig).LastWriteTimeUtc
+if ($sigWritten -lt $installer.LastWriteTimeUtc) {
+    $age = [math]::Round(($installer.LastWriteTimeUtc - $sigWritten).TotalMinutes)
+    throw "the .sig beside $($installer.Name) is $age minutes older than the installer, so it signs a build that no longer exists. Signing failed and this one went out unsigned -- scroll up in the build output for the line about the private key. Fix the password and build again; do not upload anything from this run."
+}
+
 # Read, never retype. -Raw then trim: the file is one long line and a trailing
 # newline is not part of the signature.
 $signature = (Get-Content $sig -Raw).Trim()
