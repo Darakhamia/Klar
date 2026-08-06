@@ -312,6 +312,7 @@ mod tests {
     /// reads are `url`, `bytes`, `sha256` and `file_name`.
     fn spec_for(url: &str, body: &[u8], sha: &str) -> ModelSpec {
         ModelSpec {
+            kind: crate::model::Kind::Speech,
             id: "test",
             file_name: "test-model.bin",
             url: Box::leak(url.to_owned().into_boxed_str()),

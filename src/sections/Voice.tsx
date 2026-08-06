@@ -35,7 +35,7 @@ export function Voice({
   level: number;
   onChange: (next: Settings) => void;
 }) {
-  const speech = models.filter((model) => model.id !== "silero-vad");
+  const speech = models.filter((model) => model.kind === "speech");
   const current = models.find((model) => model.id === settings.model);
 
   return (

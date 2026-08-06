@@ -8,7 +8,7 @@ use clap::{Parser, Subcommand};
 use klar_core::asr::{Accuracy, TranscribeOptions, Transcriber, WhisperTranscriber};
 use klar_core::audio::{self, Capture, CaptureConfig};
 use klar_core::model::{self, Progress};
-use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
+use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher, sidecar};
 use klar_core::store::{NewDictation, Store};
 use klar_core::stream::{Stream, StreamConfig, StreamStats, Update};
 use klar_core::vad::{StreamingVad, Vad, VadSettings};
@@ -174,11 +174,35 @@ struct VadArgs {
 
 #[derive(clap::Args)]
 struct PolishArgs {
-    /// What the speaker said, as whisper would hand it over.
+    /// What the speaker said, as whisper would hand it over. Omit it and pass
+    /// --from to run a file of dictations instead.
+    #[arg(default_value = "")]
     text: String,
+    /// One dictation per line. Blank lines and lines starting with # are
+    /// skipped, so a file of cases can carry its own headings.
+    #[arg(long)]
+    from: Option<PathBuf>,
     /// verbatim (off), light, balanced or heavy.
     #[arg(long, default_value = "balanced")]
     strength: StrengthArg,
+    /// The ISO code whisper would have reported, e.g. `ru`. Naming the language
+    /// is what stops a small model translating rather than tidying, so leaving
+    /// this off is the honest way to see how a model behaves without it.
+    #[arg(long)]
+    language: Option<String>,
+
+    /// A GGUF to run in Klar's own sidecar. This is the path a normal install
+    /// takes; the Ollama options below are the alternative, not the default.
+    #[arg(long)]
+    gguf: Option<PathBuf>,
+    /// The klar-llm executable. Found beside this binary when omitted.
+    #[arg(long)]
+    sidecar: Option<PathBuf>,
+    /// Layers to offload to the GPU. Zero keeps everything on the CPU, which is
+    /// the honest way to see what a machine without a card will do.
+    #[arg(long, default_value_t = 999)]
+    gpu_layers: u32,
+
     /// A model this Ollama has pulled. `--strength verbatim` needs none.
     #[arg(long, default_value = "")]
     model: String,
@@ -730,11 +754,18 @@ fn inject(args: &InjectArgs) -> Result<()> {
 /// way to measure the stage against its 400 ms budget without speaking.
 async fn polish(args: &PolishArgs) -> Result<()> {
     let strength = Strength::from(args.strength);
+    let cases = polish_cases(args)?;
 
     if strength == Strength::Verbatim {
         println!("verbatim — the polish stage is off, nothing was sent anywhere");
-        println!("{}", args.text);
+        for case in &cases {
+            println!("{case}");
+        }
         return Ok(());
+    }
+
+    if args.gguf.is_some() {
+        return polish_with_sidecar(args, strength, &cases).await;
     }
     if args.model.is_empty() {
         bail!("--model is required unless --strength verbatim; try `ollama list`");
@@ -756,28 +787,155 @@ async fn polish(args: &PolishArgs) -> Result<()> {
         Err(error) => bail!("{error}"),
     }
 
-    let started = Instant::now();
-    let polished = ollama
-        .polish(PolishRequest {
-            text: &args.text,
-            strength,
-            vocabulary: &[],
-        })
-        .await;
-    let took = started.elapsed();
+    let mut within = 0_usize;
+    for case in &cases {
+        let started = Instant::now();
+        let polished = ollama
+            .polish(PolishRequest {
+                text: case,
+                strength,
+                vocabulary: &[],
+                language: args.language.as_deref(),
+            })
+            .await;
+        let took = started.elapsed();
+        if took <= budget {
+            within += 1;
+        }
 
-    println!("said   {}", args.text);
-    match polished {
-        Ok(text) => println!("typed  {text}"),
-        // Not an error to the shell: a refusal is the guard doing its job, and
-        // the interesting part is what the model actually said.
-        Err(error) => println!("failed {error}"),
+        println!("said   {case}");
+        match polished {
+            Ok(text) => println!("typed  {text}"),
+            // Not an error to the shell: a refusal is the guard doing its job,
+            // and the interesting part is what the model actually said.
+            Err(error) => println!("failed {error}"),
+        }
+        println!("       {} ms\n", took.as_millis());
     }
+
     println!(
-        "\n{} ms against the {} ms budget, model {}",
-        took.as_millis(),
+        "{within}/{} within the {} ms budget, model {}",
+        cases.len(),
         budget.as_millis(),
         args.model
+    );
+    Ok(())
+}
+
+/// The dictations to run: a file if one was named, otherwise the argument.
+fn polish_cases(args: &PolishArgs) -> Result<Vec<String>> {
+    let Some(path) = &args.from else {
+        if args.text.trim().is_empty() {
+            bail!("give a line of text to polish, or --from a file of them");
+        }
+        return Ok(vec![args.text.clone()]);
+    };
+
+    let body =
+        std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
+    let cases: Vec<String> = body
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(str::to_owned)
+        .collect();
+
+    if cases.is_empty() {
+        bail!("{} has no dictations in it", path.display());
+    }
+    Ok(cases)
+}
+
+/// Run the cases through Klar's own sidecar — the path an install takes.
+///
+/// Prints what the model said *and* what the guard decided about it. Both,
+/// always: a rejection reports that the answer was 380% of the transcript, and
+/// whether that is a model writing an essay or a prompt that needs a sentence
+/// changed is a question only the text answers.
+async fn polish_with_sidecar(
+    args: &PolishArgs,
+    strength: Strength,
+    cases: &[String],
+) -> Result<()> {
+    let Some(gguf) = args.gguf.clone() else {
+        bail!("--gguf is required to run the sidecar");
+    };
+    if !gguf.is_file() {
+        bail!("no model at {}", gguf.display());
+    }
+
+    let program = match args.sidecar.clone() {
+        Some(path) => path,
+        None => sidecar::beside_current_exe().context(
+            "no klar-llm beside this binary — build it with \
+             `cargo build -p klar-llm --features engine` or pass --sidecar",
+        )?,
+    };
+
+    let budget = Duration::from_millis(args.budget_ms);
+    let mut sidecar = sidecar::Sidecar::start(sidecar::SidecarConfig {
+        program,
+        model: gguf,
+        budget,
+        gpu_layers: args.gpu_layers,
+        ..sidecar::SidecarConfig::default()
+    })
+    .await?;
+
+    {
+        let ready = sidecar.ready();
+        println!(
+            "warm   {} on {} in {} ms\n",
+            ready.model, ready.backend, ready.load_ms
+        );
+    }
+
+    let mut within = 0_usize;
+    let mut kept = 0_usize;
+    for case in cases {
+        let started = Instant::now();
+        // Unguarded, so the guard's verdict can be printed beside the text it
+        // was passed rather than instead of it.
+        let answer = sidecar
+            .polish_unguarded(PolishRequest {
+                text: case,
+                strength,
+                vocabulary: &[],
+                language: args.language.as_deref(),
+            })
+            .await;
+        let took = started.elapsed();
+
+        println!("said   {case}");
+        match answer {
+            Ok(answer) => {
+                println!("model  {}", answer.text.replace('\n', "\n       "));
+                match klar_core::polish::guard(case, &answer.text, strength) {
+                    Ok(_) => {
+                        kept += 1;
+                        println!("guard  kept");
+                    }
+                    Err(rejection) => println!("guard  REFUSED — {rejection}"),
+                }
+                if took <= budget {
+                    within += 1;
+                }
+                println!(
+                    "       {} ms end to end, {} ms generating, {} tokens\n",
+                    took.as_millis(),
+                    answer.elapsed_ms,
+                    answer.tokens
+                );
+            }
+            Err(error) => println!("failed {error}\n"),
+        }
+    }
+
+    println!(
+        "{kept}/{} kept by the guard, {within}/{} within the {} ms budget",
+        cases.len(),
+        cases.len(),
+        budget.as_millis()
     );
     Ok(())
 }

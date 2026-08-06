@@ -143,7 +143,7 @@ impl TextPolisher for Ollama {
             return Ok(request.text.to_owned());
         };
 
-        let system = super::system_prompt(instructions, request.vocabulary);
+        let system = super::system_prompt(instructions, &request);
 
         let body = serde_json::json!({
             "model": self.config.model,
@@ -229,6 +229,7 @@ mod tests {
                 text: "some words",
                 strength: Strength::Balanced,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect_err("nothing is listening");
@@ -258,6 +259,7 @@ mod tests {
                 text,
                 strength: Strength::Verbatim,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect("verbatim cannot fail");

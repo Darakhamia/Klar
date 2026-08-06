@@ -1,6 +1,16 @@
 //! What the polish stage must and must not do to real dictations.
 //!
-//! These run against a live model, so they are skipped unless one is pointed at:
+//! These run against a live model, so they are skipped unless one is pointed at.
+//! Either the model Klar ships, through its own sidecar:
+//!
+//! ```sh
+//! cargo build -p klar-llm --features engine
+//! KLAR_POLISH_GGUF=~/models/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+//! KLAR_POLISH_SIDECAR=target/debug/klar-llm \
+//!   cargo test -p klar-core --test polish_fixtures -- --nocapture
+//! ```
+//!
+//! or a model server the machine already runs:
 //!
 //! ```sh
 //! KLAR_OLLAMA_MODEL=llama3.2:3b cargo test -p klar-core --test polish_fixtures
@@ -21,7 +31,7 @@
     reason = "an integration test; a failure here is the report"
 )]
 
-use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher};
+use klar_core::polish::{Ollama, OllamaConfig, PolishRequest, Strength, TextPolisher, sidecar};
 use std::time::{Duration, Instant};
 
 /// One dictation and what must be true of the result.
@@ -34,6 +44,36 @@ struct Fixture {
     /// Words that must be gone. Fillers, and the halves of self-corrections
     /// the speaker abandoned.
     drops: &'static [&'static str],
+    /// What whisper would have reported. Passed through exactly as the pipeline
+    /// passes it, because for a small model it is the difference between a
+    /// cleanup and a translation — see `PolishRequest::language`.
+    language: Option<&'static str>,
+}
+
+impl Fixture {
+    /// Everything wrong with one result, as sentences a person can act on.
+    fn faults_in(&self, polished: &str) -> Vec<String> {
+        let lowered = polished.to_lowercase();
+        let mut faults = Vec::new();
+
+        for keep in self.keeps {
+            if !lowered.contains(&keep.to_lowercase()) {
+                faults.push(format!(
+                    "lost {keep:?}\n  said: {}\n  got:  {polished}",
+                    self.said
+                ));
+            }
+        }
+        for drop in self.drops {
+            if lowered.contains(&drop.to_lowercase()) {
+                faults.push(format!(
+                    "kept {drop:?}\n  said: {}\n  got:  {polished}",
+                    self.said
+                ));
+            }
+        }
+        faults
+    }
 }
 
 const FIXTURES: &[Fixture] = &[
@@ -44,6 +84,7 @@ const FIXTURES: &[Fixture] = &[
         keeps: &["Friday", "notes"],
         // The abandoned half of the correction, and the fillers around it.
         drops: &["Thursday", "um", "uh"],
+        language: Some("en"),
     },
     Fixture {
         said: "can you send me the numbers for Q3 when you get a chance",
@@ -52,6 +93,7 @@ const FIXTURES: &[Fixture] = &[
         // rather than answer it. `drops` catches the shapes an answer takes.
         keeps: &["Q3"],
         drops: &["Sure", "Certainly", "I don't have", "As an AI"],
+        language: Some("en"),
     },
     Fixture {
         said: "the deploy is at four thirty and Marcus is on call and the rollback \
@@ -59,6 +101,7 @@ const FIXTURES: &[Fixture] = &[
         strength: Strength::Balanced,
         keeps: &["Marcus", "runbook", "rollback"],
         drops: &[],
+        language: Some("en"),
     },
     Fixture {
         said: "so basically what I'm trying to say is that at the end of the day \
@@ -67,14 +110,83 @@ const FIXTURES: &[Fixture] = &[
         strength: Strength::Heavy,
         keeps: &["week"],
         drops: &["basically", "at the end of the day", "I'm trying to say"],
+        language: Some("en"),
     },
     Fixture {
         said: "перенесём ревью на четверг нет на пятницу и я потом напишу заметки",
         strength: Strength::Balanced,
         keeps: &["пятниц", "заметки"],
         drops: &["Friday", "review"],
+        language: Some("ru"),
     },
 ];
+
+/// The sidecar path: Klar's own model, in the process an install runs it in.
+#[tokio::test]
+async fn the_fixtures_survive_the_model_klar_ships() {
+    let Ok(gguf) = std::env::var("KLAR_POLISH_GGUF") else {
+        eprintln!("skipped: set KLAR_POLISH_GGUF to a GGUF to run this");
+        return;
+    };
+
+    let program = match std::env::var("KLAR_POLISH_SIDECAR") {
+        Ok(path) => std::path::PathBuf::from(path),
+        Err(_) => sidecar::beside_current_exe()
+            .expect("no klar-llm beside the test binary; set KLAR_POLISH_SIDECAR"),
+    };
+
+    let mut sidecar = sidecar::Sidecar::start(sidecar::SidecarConfig {
+        program,
+        model: std::path::PathBuf::from(&gguf),
+        // Not the pipeline's 400 ms. These say whether the prompt and the guard
+        // are right, and the machine running them may have no GPU at all;
+        // latency is reported below rather than asserted.
+        budget: Duration::from_secs(120),
+        ..sidecar::SidecarConfig::default()
+    })
+    .await
+    .expect("the sidecar starts");
+
+    println!(
+        "{} on {} in {} ms\n",
+        sidecar.ready().model,
+        sidecar.ready().backend,
+        sidecar.ready().load_ms
+    );
+
+    let mut failures = Vec::new();
+    for fixture in FIXTURES {
+        let started = Instant::now();
+        let polished = sidecar
+            .polish(PolishRequest {
+                text: fixture.said,
+                strength: fixture.strength,
+                vocabulary: &[],
+                language: fixture.language,
+            })
+            .await;
+        let took = started.elapsed();
+
+        match polished {
+            Ok(text) => {
+                failures.extend(fixture.faults_in(&text));
+                println!("{took:>8?}  {text}");
+            }
+            Err(error) => failures.push(format!(
+                "{:?}\n  said: {}\n  {error}",
+                fixture.strength, fixture.said
+            )),
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "{} of {} fixtures failed against {gguf}:\n\n{}",
+        failures.len(),
+        FIXTURES.len(),
+        failures.join("\n\n")
+    );
+}
 
 #[tokio::test]
 async fn the_fixtures_survive_a_real_model() {
@@ -120,6 +232,7 @@ async fn the_fixtures_survive_a_real_model() {
                 text: fixture.said,
                 strength: fixture.strength,
                 vocabulary: &[],
+                language: None,
             })
             .await;
         let took = started.elapsed();
@@ -136,23 +249,7 @@ async fn the_fixtures_survive_a_real_model() {
             }
         };
 
-        let lowered = polished.to_lowercase();
-        for keep in fixture.keeps {
-            if !lowered.contains(&keep.to_lowercase()) {
-                failures.push(format!(
-                    "lost {keep:?}\n  said: {}\n  got:  {polished}",
-                    fixture.said
-                ));
-            }
-        }
-        for drop in fixture.drops {
-            if lowered.contains(&drop.to_lowercase()) {
-                failures.push(format!(
-                    "kept {drop:?}\n  said: {}\n  got:  {polished}",
-                    fixture.said
-                ));
-            }
-        }
+        failures.extend(fixture.faults_in(&polished));
 
         println!("{:>8?}  {polished}", took);
     }

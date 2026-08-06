@@ -50,8 +50,14 @@ export const checkForUpdate = (): Promise<Available | null> =>
  * the process is replaced. */
 export const installUpdate = (): Promise<void> => invoke<void>("update_install");
 
+/** Which of the three unrelated things a catalogue entry is. The settings
+ * window offers "speech"; "voice" is required rather than chosen; "polish" is
+ * the sidecar's model. */
+export type ModelKind = "speech" | "voice" | "polish";
+
 export interface ModelStatus {
   id: string;
+  kind: ModelKind;
   fileName: string;
   url: string;
   sha256: string;

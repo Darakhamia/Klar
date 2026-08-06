@@ -138,6 +138,20 @@ pub struct TranscribeOptions {
     pub accuracy: Accuracy,
 }
 
+/// The English name of a language whisper knows, from its ISO code.
+///
+/// whisper's own table rather than one written here: it covers exactly the
+/// languages that can come out of the ASR stage, and it cannot drift from them.
+///
+/// The polish stage needs the name rather than the code. A 1.5B model told
+/// "reply in ru" is not reliably told anything; told "the text is in Russian,
+/// reply in Russian" it stops translating — measured, and the reason this
+/// function exists. See [`crate::polish`].
+pub fn language_name(code: &str) -> Option<&'static str> {
+    let id = whisper_rs::get_lang_id(code)?;
+    whisper_rs::get_lang_str_full(id)
+}
+
 /// What came back.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transcript {

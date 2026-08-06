@@ -200,6 +200,48 @@ impl Sidecar {
     pub fn ready(&self) -> &Ready {
         &self.ready
     }
+
+    /// The model's answer with [`guard`] not applied, and what it cost.
+    ///
+    /// Not for the pipeline, which must never insert unguarded text. This is
+    /// for `klar-cli polish`, where the question being asked is what the model
+    /// actually said: a rejection reports that the result was 380% of the
+    /// transcript, and the only way to know whether that is a model writing an
+    /// essay or a prompt that needs a sentence changed is to read it.
+    pub async fn polish_unguarded(
+        &mut self,
+        request: PolishRequest<'_>,
+    ) -> Result<Polished, PolishError> {
+        self.link.ask(request).await
+    }
+}
+
+/// One answer from the model, before anything has judged it.
+#[derive(Debug, Clone)]
+pub struct Polished {
+    pub text: String,
+    /// The child's own measurement, which excludes the pipe and the parent's
+    /// scheduling. Lower than what the user waits for, and the right number for
+    /// comparing two models.
+    pub elapsed_ms: u64,
+    pub tokens: u32,
+}
+
+/// The sidecar as it sits beside the running binary.
+///
+/// Where both callers find it: Tauri's `externalBin` places it next to Klar's
+/// own executable in an installed build, and `cargo build` puts it next to
+/// `klar-cli` in a development one. `None` if the current executable cannot be
+/// located, which is not a case worth a distinct error — it means the same
+/// thing as not finding the file.
+pub fn beside_current_exe() -> Option<PathBuf> {
+    let name = if cfg!(windows) {
+        "klar-llm.exe"
+    } else {
+        "klar-llm"
+    };
+    let beside = std::env::current_exe().ok()?.with_file_name(name);
+    beside.is_file().then_some(beside)
 }
 
 impl TextPolisher for Sidecar {
@@ -231,10 +273,27 @@ struct Link<W> {
 
 impl<W: AsyncWrite + Unpin + Send> Link<W> {
     async fn polish(&mut self, request: PolishRequest<'_>) -> Result<String, PolishError> {
-        let Some(instructions) = request.strength.prompt() else {
+        if request.strength.prompt().is_none() {
             // Verbatim reaching here is a caller bug, not a reason to hand the
             // user's words to a model.
             return Ok(request.text.to_owned());
+        }
+
+        let strength = request.strength;
+        let text = request.text;
+        let answer = self.ask(request).await?;
+        Ok(guard(text, &answer.text, strength)?)
+    }
+
+    /// Ask, and hand back whatever came out. Judging it is the caller's job —
+    /// which for everything but `klar-cli` means [`Link::polish`].
+    async fn ask(&mut self, request: PolishRequest<'_>) -> Result<Polished, PolishError> {
+        let Some(instructions) = request.strength.prompt() else {
+            return Ok(Polished {
+                text: request.text.to_owned(),
+                elapsed_ms: 0,
+                tokens: 0,
+            });
         };
 
         self.next_id += 1;
@@ -242,7 +301,7 @@ impl<W: AsyncWrite + Unpin + Send> Link<W> {
 
         self.send(&Request {
             id,
-            system: system_prompt(instructions, request.vocabulary),
+            system: system_prompt(instructions, &request),
             user: request.text.to_owned(),
             max_tokens: self.cap_for(request.text, request.strength),
         })
@@ -256,7 +315,11 @@ impl<W: AsyncWrite + Unpin + Send> Link<W> {
                 ..
             } => {
                 tracing::debug!(elapsed_ms, tokens, "polished");
-                Ok(guard(request.text, &text, request.strength)?)
+                Ok(Polished {
+                    text,
+                    elapsed_ms,
+                    tokens,
+                })
             }
             Response::Failed { message, .. } => Err(PolishError::Model(message)),
             Response::Ready { .. } => Err(PolishError::Unreadable(
@@ -453,6 +516,7 @@ mod tests {
                 text: first,
                 strength: Strength::Balanced,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect_err("the child says nothing in time");
@@ -499,6 +563,7 @@ mod tests {
                 text: second,
                 strength: Strength::Balanced,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect("the second dictation is answered");
@@ -524,6 +589,7 @@ mod tests {
                 text: "anything at all",
                 strength: Strength::Light,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect_err("the child is gone");
@@ -551,6 +617,7 @@ mod tests {
                 text,
                 strength: Strength::Verbatim,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect("verbatim cannot fail");
@@ -583,6 +650,7 @@ mod tests {
                 text: "a long dictation",
                 strength: Strength::Balanced,
                 vocabulary: &[],
+                language: None,
             })
             .await
             .expect_err("the model refused");
@@ -618,6 +686,7 @@ mod tests {
                 text: "send it to Darakhamia",
                 strength: Strength::Light,
                 vocabulary: &vocabulary,
+                language: None,
             })
             .await;
 

@@ -156,13 +156,24 @@ pub enum PolishError {
 }
 
 /// Everything a polisher needs to know for one call.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PolishRequest<'a> {
     pub text: &'a str,
     pub strength: Strength,
     /// Terms the user has taught Klar, so the model does not helpfully correct
     /// a name it has never seen. Empty until M5 fills the dictionary in.
     pub vocabulary: &'a [String],
+    /// The ISO code whisper reported for this utterance, when it reported one.
+    ///
+    /// Not decoration. A 1.5B model handed Russian and a prompt that says
+    /// "never translate" translates it anyway about half the time; handed the
+    /// same text and a prompt that says "this is Russian, reply in Russian" it
+    /// stops. The transcription stage already knows which language it heard,
+    /// and this is that knowledge reaching the stage that needs it.
+    ///
+    /// `None` leaves the instruction out entirely rather than guessing, because
+    /// naming the wrong language is worse than naming none.
+    pub language: Option<&'a str>,
 }
 
 /// A stage that turns a transcript into finished text.
@@ -219,18 +230,53 @@ impl TextPolisher for Polisher {
 /// sentence is part of the prompt's behaviour, and two implementations that
 /// worded it differently would polish differently for reasons no one would
 /// think to look for.
-fn system_prompt(instructions: &str, vocabulary: &[String]) -> String {
-    if vocabulary.is_empty() {
-        return instructions.to_owned();
+fn system_prompt(instructions: &str, request: &PolishRequest<'_>) -> String {
+    let mut prompt = instructions.to_owned();
+
+    // The language, named. Measured on Qwen2.5-1.5B: three Russian dictations
+    // through the prompt alone came back translated into English twice; the
+    // same three with this line came back in Russian three times out of three.
+    // Resolved through whisper's own table so a code it never emits cannot
+    // produce a sentence naming a language that is not there.
+    if let Some(name) = request.language.and_then(crate::asr::language_name) {
+        // whisper's table is lowercase ("russian"); the measurement that
+        // justifies this sentence was made with the capitalised name, which is
+        // also how a language reads in the middle of an English one.
+        let mut name = name.to_owned();
+        name[..1].make_ascii_uppercase();
+        prompt.push_str(&format!(
+            "\n\nThe text you are given is in {name}. Write your reply in {name}."
+        ));
     }
 
     // Names the speaker has taught Klar. Without this a model helpfully
     // "corrects" them, which is the opposite of the dictionary's job.
-    format!(
-        "{instructions}\nThese words are spelled correctly and must not be changed: {}.",
-        vocabulary.join(", ")
-    )
+    if !request.vocabulary.is_empty() {
+        prompt.push_str(&format!(
+            "\nThese words are spelled correctly and must not be changed: {}.",
+            request.vocabulary.join(", ")
+        ));
+    }
+
+    prompt
 }
+
+/// Characters a cleanup may drop before the length floor starts asking
+/// questions, however short the dictation was.
+///
+/// One abandoned clause and the filler introducing it — "в три ну то есть",
+/// "to Thursday, no". Forty rather than the twenty-eight that the measured case
+/// needed, because the case that produced that number is not the worst one that
+/// is still legitimate.
+const ALWAYS_DROPPABLE: usize = 40;
+
+/// The floor that still applies once [`ALWAYS_DROPPABLE`] has been forgiven.
+///
+/// A short dictation may lose most of itself to a correction; it may not lose
+/// nearly all of itself. Equal to heavy's own floor, so this can only ever
+/// relax a stricter strength down to the most permissive one the guard already
+/// trusts, and never below it.
+const SHORT_DICTATION_FLOOR: f32 = 0.24;
 
 /// Decide whether a polished result is a cleaned-up transcript or something
 /// else the model decided to write.
@@ -252,8 +298,33 @@ pub fn guard(transcript: &str, polished: &str, strength: Strength) -> Result<Str
         return Ok(polished.to_owned());
     }
 
-    let ratio = polished.chars().count() as f32 / before as f32;
+    let after = polished.chars().count();
+    let ratio = after as f32 / before as f32;
     let (floor, ceiling) = strength.bounds();
+
+    // The floor asks "is this a summary rather than a cleanup?", and on a long
+    // dictation the ratio answers it well. On a short one it does not, because
+    // a self-correction is a fixed number of characters and the shorter the
+    // sentence the larger a fraction of it that is.
+    //
+    // Measured, on a real rejection: "давай созвонимся в три ну то есть в
+    // четыре я перепутал" polished to "давай созвонимся в четыре." — the
+    // correction resolved exactly as the prompt asks, 28 characters dropped out
+    // of 54, and refused at 48% against balanced's 55% floor. Correct output,
+    // thrown away, and the user would have seen the unpolished transcript with
+    // no idea why.
+    //
+    // So a fixed allowance of dropped characters is forgiven, and below it the
+    // floor relaxes to [`SHORT_DICTATION_FLOOR`] rather than disappearing —
+    // otherwise a model that answered a short question with "." would pass.
+    // Nothing here loosens the long case: dropping 110 characters is still
+    // measured against the strength's own floor, whatever the ratio works out
+    // to.
+    let floor = if before.saturating_sub(after) <= ALWAYS_DROPPABLE {
+        floor.min(SHORT_DICTATION_FLOOR)
+    } else {
+        floor
+    };
 
     if ratio < floor {
         return Err(Rejection::TooShort {
@@ -338,12 +409,102 @@ mod tests {
             // absence would be worst: a model that answers the dictation, and a
             // model that helpfully translates it.
             assert!(
-                flowed.contains("never translate"),
+                flowed.contains("same language as the text you were given"),
                 "{strength:?}: prompt does not forbid translating"
             );
             assert!(
                 flowed.contains("You are not an assistant"),
                 "{strength:?}: prompt does not forbid answering"
+            );
+        }
+    }
+
+    /// The rejection that produced [`ALWAYS_DROPPABLE`], kept verbatim.
+    ///
+    /// Qwen2.5-1.5B did exactly what balanced.md asks — resolved the
+    /// correction, dropped the speaker's aside about having mixed it up, stayed
+    /// in Russian — and the guard threw it away for being 48% of a 54-character
+    /// sentence. A future tightening of the floor should have to walk past this.
+    #[test]
+    fn a_short_dictation_may_lose_half_of_itself_to_one_correction() {
+        let said = "давай созвонимся в три ну то есть в четыре я перепутал";
+        let polished = "давай созвонимся в четыре.";
+
+        assert_eq!(
+            guard(said, polished, Strength::Balanced).as_deref(),
+            Ok(polished),
+            "a resolved self-correction is what balanced was asked for"
+        );
+    }
+
+    /// The other half of that: the allowance must not become a way for a
+    /// summary of a long dictation to get through.
+    #[test]
+    fn a_long_dictation_may_not_lose_the_same_fraction() {
+        let said = "so the thing about the migration is that we have about four \
+                    hundred tables and the foreign keys are a mess and nobody has \
+                    touched the reporting schema since two thousand nineteen";
+        let summary = "The migration covers four hundred messy tables.";
+
+        assert!(
+            matches!(
+                guard(said, summary, Strength::Balanced),
+                Err(Rejection::TooShort { .. })
+            ),
+            "40 characters are forgiven; 130 are a summary"
+        );
+    }
+
+    /// And the allowance may not let a model answer a short question with
+    /// almost nothing.
+    #[test]
+    fn the_allowance_does_not_permit_an_empty_gesture() {
+        let said = "can you send me the numbers for Q3";
+        assert!(
+            matches!(
+                guard(said, ".", Strength::Balanced),
+                Err(Rejection::TooShort { .. })
+            ),
+            "dropping under the short-dictation floor is still a rejection"
+        );
+    }
+
+    /// The prompt is where the language is named, and it is named because a
+    /// 1.5B model does not otherwise keep it. Two Russian dictations out of
+    /// three came back in English through the instruction alone; three out of
+    /// three stayed Russian once the language was stated.
+    #[test]
+    fn a_known_language_is_named_to_the_model() {
+        let request = PolishRequest {
+            text: "перенесём ревью на пятницу",
+            strength: Strength::Balanced,
+            language: Some("ru"),
+            ..PolishRequest::default()
+        };
+        let prompt = system_prompt("INSTRUCTIONS", &request);
+
+        assert!(
+            prompt.contains("in Russian"),
+            "the language must be named, not implied: {prompt}"
+        );
+    }
+
+    /// An unknown or absent code leaves the sentence out rather than writing a
+    /// wrong one. Telling a model the text is in "xx" is worse than telling it
+    /// nothing.
+    #[test]
+    fn an_unknown_language_is_left_unsaid() {
+        for code in [None, Some("xx"), Some("")] {
+            let request = PolishRequest {
+                text: "some words",
+                strength: Strength::Balanced,
+                language: code,
+                ..PolishRequest::default()
+            };
+            let prompt = system_prompt("INSTRUCTIONS", &request);
+            assert_eq!(
+                prompt, "INSTRUCTIONS",
+                "{code:?} should add nothing, got {prompt}"
             );
         }
     }

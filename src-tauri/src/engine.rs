@@ -537,6 +537,7 @@ fn polish(
         strength: cleanup,
         // M5's dictionary fills this in.
         vocabulary: &[],
+        language: None,
     };
 
     match runtime.block_on(polisher.polish(request)) {
