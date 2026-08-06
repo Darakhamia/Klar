@@ -1,0 +1,38 @@
+[package]
+name = "klar-llm"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The language model Klar polishes with, as its own process."
+
+[features]
+# Nothing by default, and that is the point. `klar-core` depends on this crate
+# for the wire types and must not drag llama.cpp into its build: a dependency
+# is per package, not per target, so the binary's whole inference stack is
+# behind a feature the library end never turns on. A `cargo test -p klar-core`
+# that compiled llama.cpp would take minutes and prove nothing.
+default = []
+engine = ["dep:llama-cpp-2", "dep:anyhow", "dep:clap"]
+# Same names as klar-core's, so one --features flag on a release build reaches
+# both inference stacks.
+cuda = ["engine", "llama-cpp-2/cuda"]
+vulkan = ["engine", "llama-cpp-2/vulkan"]
+metal = ["engine", "llama-cpp-2/metal"]
+
+[[bin]]
+name = "klar-llm"
+path = "src/main.rs"
+required-features = ["engine"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+llama-cpp-2 = { version = "0.1.154", optional = true }
+anyhow = { workspace = true, optional = true }
+clap = { version = "4.6.5", features = ["derive"], optional = true }
+
+[lints]
+workspace = true

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/klar-core", "crates/klar-platform", "crates/klar-cli", "src-tauri"]
+members = ["crates/klar-core", "crates/klar-platform", "crates/klar-llm", "crates/klar-cli", "src-tauri"]
 resolver = "3"
 
 [workspace.package]
@@ -12,6 +12,7 @@ repository = "https://github.com/darakhamia/klar"
 [workspace.dependencies]
 klar-core = { path = "crates/klar-core" }
 klar-platform = { path = "crates/klar-platform" }
+klar-llm = { path = "crates/klar-llm" }
 
 anyhow = "1.0.104"
 thiserror = "2.0.19"

@@ -402,4 +402,41 @@ mod tests {
         let said = "перенесём ревью на пятницу";
         assert!(guard(said, said, Strength::Balanced).is_ok());
     }
+
+    /// Three real answers from a real model, kept verbatim.
+    ///
+    /// SmolLM2-360M-Instruct, given `balanced.md` and these transcripts, on the
+    /// run that first proved the sidecar worked end to end. Every one of them
+    /// is the failure this guard was written for, months before there was a
+    /// local model to produce one: the stage was asked to tidy and it answered,
+    /// explained, or wrote a commentary on its own edits.
+    ///
+    /// They are here rather than in a note because they are the only evidence
+    /// that the bounds are set where they need to be, and because a later
+    /// loosening of them should have to walk past this.
+    #[test]
+    fn a_small_model_answering_instead_of_tidying_is_refused() {
+        let cases = [
+            (
+                "so I guess we should um push the review to Thursday no Friday and uh I'll write up the notes after",
+                "Here's the revised text:\n\n\"I'll review your draft on Thursday, no Friday. I'll write up the notes after that.\"",
+            ),
+            (
+                "can you send me the Q3 numbers when you get a chance",
+                "I'm sorry for the misunderstanding, but as an AI text-based model, I don't have access to real-time data or ability to send emails. However, I can certainly help you with your request.",
+            ),
+            (
+                "okay so the plan is like three things first we ship the installer then uh the certificate and then I mean the AI thing",
+                "Here's a revised version of the plan with some suggested changes:\n\n\"First, we ship the installer. Then, we provide the certificate. Finally, I'll introduce you to our AI system.\"\n\nI made a few changes to make the plan more concise and clear.",
+            ),
+        ];
+
+        for (said, answered) in cases {
+            let verdict = guard(said, answered, Strength::Balanced);
+            assert!(
+                verdict.is_err(),
+                "a model answering the question got through: {answered:?}"
+            );
+        }
+    }
 }
