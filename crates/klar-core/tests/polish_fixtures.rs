@@ -119,6 +119,28 @@ const FIXTURES: &[Fixture] = &[
         drops: &["Friday", "review"],
         language: Some("ru"),
     },
+    // Code-switching: started in one language, finished in another. Open, and
+    // here so that choosing a polish model is judged against it rather than
+    // around it.
+    //
+    // No model tried so far can do this. Qwen2.5-1.5B translates the whole
+    // thing into English whether the prompt names one language, names the mix,
+    // or says nothing — four attempts, four translations. Qwen2.5-3B keeps the
+    // Russian and drops the first half of the sentence instead. The guard
+    // refuses all of it (47%, 69% and 36% word overlap against a 75% floor), so
+    // what reaches the user is the transcript unpolished rather than a
+    // translation — the right failure, but a failure.
+    //
+    // `language: None` because there is no single answer whisper could give
+    // that would be true, and naming either half is what makes the model
+    // translate the other.
+    Fixture {
+        said: "so um let's move the review to Friday и я потом напишу заметки и отправлю Марку",
+        strength: Strength::Balanced,
+        keeps: &["Friday", "заметки", "Марку"],
+        drops: &["um", "notes", "send"],
+        language: None,
+    },
 ];
 
 /// The sidecar path: Klar's own model, in the process an install runs it in.
