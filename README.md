@@ -399,34 +399,102 @@ A Vulkan build needs none of this and takes the plain config: the loader,
 GPU worth using, and the shaders are compiled into the binary at build time.
 That is a quarter of a gigabyte the installer does not carry.
 
-### Code signing
+### Updates
 
-Unsigned, Windows SmartScreen shows "Windows protected your PC" on first run and
-hides the Run button behind "More info". That is not a bug to work around — it
-is Windows saying it does not know who wrote this, which is true.
+Klar checks for a newer version at startup and can install one from Settings →
+General → Updates. Two things have to exist for that to work, and only one of
+them is in this repository.
 
-Signing needs a certificate, which has to be bought and issued to a named person
-or company. Everything else is already configured: `bundle.windows` carries the
-SHA-256 digest and an RFC 3161 timestamp URL, and the timestamp is the part
-people forget — without it the signature dies with the certificate and every
-copy already installed stops verifying.
-
-With a certificate in the Windows certificate store, one line makes builds
-signed:
+**One: a signing keypair.** Every update is signed, and the public half is
+compiled into the app; an installer that does not verify is refused before it
+runs. This is separate from Windows code signing below — that one tells Windows
+who wrote the app, this one stops the update channel itself from being a way in.
+Generate it once and never lose the private half:
 
 ```powershell
-# The thumbprint of the certificate, from certmgr.msc or:
+npm run tauri signer generate -- -w $HOME\.klar\updater.key
+```
+
+Put the **public** key in `src-tauri/tauri.conf.json` under `plugins.updater.pubkey`,
+and set the private half in the environment of whatever builds releases:
+
+```powershell
+$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $HOME\.klar\updater.key -Raw
+$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "..."      # what you chose
+npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.json
+```
+
+That extra config turns on `createUpdaterArtifacts`, which produces a `.sig`
+beside the installer. Without it you get an ordinary installer and no update.
+
+**Two: a manifest on the site.** `plugins.updater.endpoints` points at a JSON
+file — change the host there to yours. It looks like this, and the `signature`
+is the contents of the `.sig` file the build produced:
+
+```json
+{
+  "version": "0.2.0",
+  "notes": "The dictionary, history and statistics.",
+  "pub_date": "2026-08-06T12:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "<contents of Klar_0.2.0_x64-setup.exe.sig>",
+      "url": "https://klar.app/downloads/Klar_0.2.0_x64-setup.exe"
+    }
+  }
+}
+```
+
+Klar compares `version` against its own and offers the update when it is newer.
+Serve it over HTTPS.
+
+**Publish the Vulkan build to the update channel.** There is one
+`windows-x86_64` key and two flavours of installer, and Vulkan is the one that
+runs on every card. A CUDA build offered to somebody with an AMD card would
+install, work, and be ten times slower.
+
+**An update replaces the previous Klar; it does not sit beside it.** The
+installer keys off `identifier` (`app.klar.desktop`) and installs to a directory
+named after `productName`, and neither carries the version — so 0.2.0 finds
+0.1.0's registry entry, removes it and takes its place. That is also why the
+identifier must never change.
+
+### Code signing
+
+Unsigned, Windows SmartScreen shows "Windows protected your PC" on first run.
+Everything except the certificate is already configured — see the section above
+this one for the digest and timestamp settings, and note that the timestamp is
+the part people forget, without which a signature dies with its certificate.
+
+Getting a certificate is the part that costs money, and the landscape changed:
+since 2023 the private key must live on a hardware token or in a cloud HSM, so a
+`.pfx` file you can copy around is no longer issued.
+
+- **Azure Trusted Signing** is the cheapest way in — roughly the price of a
+  coffee per month rather than several hundred a year — and it needs no token in
+  the post. It signs through a cloud service, so it fits a build script. It
+  requires a verified organisation, or an individual identity with three years
+  of history.
+- **A traditional OV certificate** from Sectigo, DigiCert or similar runs a few
+  hundred a year and arrives on a USB token, which means release builds happen
+  on a machine with that token plugged in.
+
+Neither makes SmartScreen quiet immediately: it trusts reputation, which
+accumulates over installs. An EV certificate skips that wait and costs more.
+
+With a certificate in the Windows store, set its thumbprint in
+`bundle.windows.certificateThumbprint`:
+
+```powershell
 Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Format-List Subject, Thumbprint
 ```
 
-Put it in `src-tauri/tauri.conf.json` under `bundle.windows.certificateThumbprint`.
-Modern OV and EV certificates live on a hardware token or in a cloud HSM rather
-than in the store; those need `bundle.windows.signCommand` instead, pointing at
-the vendor's signing tool.
+Token- and HSM-based certificates never appear there; those use
+`bundle.windows.signCommand` instead, pointing at the vendor's signing tool.
 
-A self-signed certificate is worth ten minutes before buying one: it proves the
+A self-signed certificate is worth ten minutes before buying one. It proves the
 whole pipeline signs, timestamps and installs, and it changes nothing about
-SmartScreen, which trusts issuers rather than signatures.
+SmartScreen — which trusts issuers, not signatures.
 
 ```powershell
 $cert = New-SelfSignedCertificate -Type CodeSigning -Subject "CN=Klar Test" `
@@ -436,14 +504,10 @@ $cert.Thumbprint
 
 ### Still to do before this goes to anyone else
 
-- **Auto-update.** Not built. `tauri-plugin-updater` needs somewhere to publish
-  to and a signing keypair, and building the machinery before there is a release
-  channel is the definition of scaffolding. When there is one, this is an
-  afternoon.
 - **macOS.** Hardened runtime, Developer ID, notarization and a DMG, none of
   which can be prepared from a Windows machine, and the platform backend is
   still a stub.
 
-## Licence## Licence
+## Licence
 
 MIT.

@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The settings window, and only it, may hand a URL to the system browser.",
+  "description": "The settings window, and only it. It may hand a URL to the system browser, and it may restart Klar — which is the last step of installing an update. Checking and downloading are Rust commands rather than plugin permissions, so the frontend cannot reach the update server on its own.",
   "windows": ["main"],
-  "permissions": ["opener:allow-open-url"]
+  "permissions": ["opener:allow-open-url", "process:allow-restart"]
 }

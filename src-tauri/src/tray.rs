@@ -37,6 +37,21 @@ fn on_menu(app: &AppHandle, event: MenuEvent) {
     }
 }
 
+/// Say, in the one place Klar is always visible, that there is a newer version.
+///
+/// The tooltip and nothing else: no balloon, no window stealing focus, no badge
+/// that has to be dismissed. Klar is a background app, and an app that
+/// interrupts to talk about itself is the thing this is trying not to be. The
+/// row in Settings is where the update is actually installed.
+pub fn announce_update(app: &AppHandle, version: &str) {
+    let Some(tray) = app.tray_by_id("klar") else {
+        return;
+    };
+    if let Err(error) = tray.set_tooltip(Some(format!("Klar — {version} is available"))) {
+        tracing::warn!(%error, "could not update the tray tooltip");
+    }
+}
+
 pub fn show_settings(app: &AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         tracing::warn!("no main window to show");

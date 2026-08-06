@@ -10,6 +10,7 @@ mod onboarding;
 mod overlay;
 mod settings;
 mod tray;
+mod updates;
 
 use engine::{Engine, EngineConfig, UiEvent};
 use klar_core::State;
@@ -32,10 +33,17 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_process::init())
+        // Registered even in a build with no update channel: the plugin
+        // reports that itself, and `updates::check` turns it into a sentence
+        // rather than the app failing to start over a missing key.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::app_version,
             commands::acceleration,
             commands::default_hotkey,
+            commands::update_check,
+            commands::update_install,
             commands::dictionary,
             commands::dictionary_teach,
             commands::dictionary_set_enabled,
@@ -77,6 +85,10 @@ pub fn run() {
 
             let settings = Settings::load();
             restart_engine(&handle, &settings);
+
+            if settings.check_for_updates {
+                updates::check_in_background(&handle);
+            }
 
             // Both windows start hidden so a fresh install never flashes the
             // settings window behind onboarding.

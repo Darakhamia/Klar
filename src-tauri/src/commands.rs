@@ -27,6 +27,24 @@ pub fn app_version() -> AppVersion {
     }
 }
 
+/// Whether a newer Klar has been published.
+///
+/// `Ok(None)` is "you are on the newest". The check is a request for one file
+/// on the update server and carries nothing about what was dictated — see
+/// `updates.rs`.
+#[tauri::command]
+pub async fn update_check(app: AppHandle) -> Result<Option<crate::updates::Available>, String> {
+    crate::updates::check(&app).await
+}
+
+/// Download the update, verify its signature, install it, and restart.
+///
+/// Does not return on success: the process is replaced.
+#[tauri::command]
+pub async fn update_install(app: AppHandle) -> Result<(), String> {
+    crate::updates::install(&app).await
+}
+
 /// The window's connection to the database.
 ///
 /// Separate from the engine's, which opens its own. SQLite in WAL mode lets a

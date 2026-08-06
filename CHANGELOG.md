@@ -13,6 +13,23 @@ Newest first.
 
 ---
 
+## Unreleased
+
+**Updates.** Klar checks for a newer version at startup and installs one from
+Settings → General → Updates. The check asks the update server for one file and
+carries nothing about what was dictated; it is switchable and the row says so.
+Every update is signature-checked before it runs.
+
+An update replaces the previous Klar rather than sitting beside it — the
+installer keys off the app identifier and a directory named after the product,
+neither of which carries a version.
+
+Needs a signing keypair and a manifest on the site before it does anything; see
+the README. A build without them says "no update channel configured" rather than
+failing to start.
+
+---
+
 ## 0.2.0
 
 **The dictionary, history and statistics.** The three panes that had said

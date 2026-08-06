@@ -75,6 +75,14 @@ pub struct Settings {
     pub polish_endpoint: String,
     pub polish_model: String,
     pub appearance: Appearance,
+    /// Whether Klar asks the update server, at startup, whether there is a
+    /// newer version.
+    ///
+    /// On by default. The request carries Klar's version and nothing about
+    /// what was dictated — see `updates.rs` — and an unsigned app with no way
+    /// to ship a fix is worse for the people using it than one that asks a
+    /// server for a version number. Switchable, and the row says exactly that.
+    pub check_for_updates: bool,
     /// Whether first-run setup has been completed. False on a fresh install and
     /// on an install that predates onboarding — running through it again costs
     /// a few seconds when everything is already downloaded.
@@ -96,6 +104,7 @@ impl Default for Settings {
             polish_endpoint: klar_core::polish::ollama::DEFAULT_ENDPOINT.to_owned(),
             polish_model: String::new(),
             appearance: Appearance::default(),
+            check_for_updates: true,
             onboarded: false,
         }
     }

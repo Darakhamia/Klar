@@ -9,7 +9,15 @@ import {
   type Binding,
   type Modifier,
 } from "../lib/ipc";
-import type { Appearance, FinishAction, OverlayPosition, Settings } from "../lib/settings";
+import {
+  checkForUpdate,
+  installUpdate,
+  type Appearance,
+  type Available,
+  type FinishAction,
+  type OverlayPosition,
+  type Settings,
+} from "../lib/settings";
 
 export function General({
   settings,
@@ -69,6 +77,8 @@ export function General({
           }}
         />
       </Row>
+
+      <Updates settings={settings} onChange={onChange} />
 
       <Row
         label="Diagnostics"
@@ -207,6 +217,87 @@ function Hotkey({
       >
         {capturing ? "Press a key…" : "Change"}
       </button>
+    </Row>
+  );
+}
+
+/**
+ * Updates: whether to look, and installing one when there is one.
+ *
+ * Klar is unsigned and nobody is going to notice a new version on a website, so
+ * this row is the only path a fix has to somebody who already installed it.
+ * What it sends is stated rather than buried — the hint is the disclosure, and
+ * the switch next to it is what makes stating it worth anything.
+ */
+function Updates({
+  settings,
+  onChange,
+}: {
+  settings: Settings;
+  onChange: (next: Settings) => void;
+}) {
+  const [state, setState] = useState<"idle" | "checking" | "installing">("idle");
+  const [found, setFound] = useState<Available | null>(null);
+  const [said, setSaid] = useState<string | null>(null);
+
+  const check = () => {
+    setState("checking");
+    setSaid(null);
+    checkForUpdate()
+      .then((available) => {
+        setFound(available);
+        setSaid(available === null ? "Klar is up to date." : null);
+        setState("idle");
+      })
+      .catch((cause: unknown) => {
+        setSaid(cause instanceof Error ? cause.message : String(cause));
+        setState("idle");
+      });
+  };
+
+  return (
+    <Row
+      label="Updates"
+      hint={
+        found
+          ? `Version ${found.version} is available. You have ${found.current}.`
+          : (said ??
+            "Checking asks the update server for one file. It carries Klar's version and nothing about what you dictated. Every update is signature-checked before it runs.")
+      }
+    >
+      <Segmented<"on" | "off">
+        value={settings.checkForUpdates ? "on" : "off"}
+        options={[
+          { value: "on", label: "Check at startup" },
+          { value: "off", label: "Off" },
+        ]}
+        onChange={(value) => {
+          onChange({ ...settings, checkForUpdates: value === "on" });
+        }}
+      />
+
+      {found ? (
+        <button
+          type="button"
+          className="btn"
+          disabled={state === "installing"}
+          onClick={() => {
+            setState("installing");
+            setSaid(null);
+            // Only resolves on failure: success replaces this process.
+            installUpdate().catch((cause: unknown) => {
+              setSaid(cause instanceof Error ? cause.message : String(cause));
+              setState("idle");
+            });
+          }}
+        >
+          {state === "installing" ? "Installing…" : `Install ${found.version}`}
+        </button>
+      ) : (
+        <button type="button" className="btn btn--ghost" disabled={state === "checking"} onClick={check}>
+          {state === "checking" ? "Checking…" : "Check now"}
+        </button>
+      )}
     </Row>
   );
 }

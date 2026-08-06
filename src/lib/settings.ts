@@ -27,8 +27,25 @@ export interface Settings {
   polishEndpoint: string;
   polishModel: string;
   appearance: Appearance;
+  checkForUpdates: boolean;
   onboarded: boolean;
 }
+
+/** A newer Klar, when the update server has one. */
+export interface Available {
+  version: string;
+  current: string;
+  notes: string | null;
+  date: string | null;
+}
+
+/** `null` means this is the newest version. */
+export const checkForUpdate = (): Promise<Available | null> =>
+  invoke<Available | null>("update_check");
+
+/** Downloads, verifies, installs and restarts. Does not resolve on success —
+ * the process is replaced. */
+export const installUpdate = (): Promise<void> => invoke<void>("update_install");
 
 export interface ModelStatus {
   id: string;
