@@ -7,12 +7,16 @@
     once, and it does it late: the manifest parses, the version shows, the
     button appears, the installer downloads in full, and only then does the
     signature check refuse it. One mis-copied character out of a few hundred
-    does that. So the field is never typed — it is read out of the .sig file the
+    does that. So the field is never typed: it is read out of the .sig file the
     build wrote.
 
     This script only writes the manifest and checks it against reality. Upload
     is manual scp, on purpose: the box that receives it is a static nginx and
     nothing here should be able to reach it.
+
+    ASCII only, and no cmdlet newer than PowerShell 5.1. Windows PowerShell
+    reads .ps1 files as ANSI rather than UTF-8, so a single em dash in a string
+    arrives as three bytes of mojibake and takes the quoting with it.
 
 .PARAMETER Bundle
     Where `tauri build` left the installer. Defaults to the bundle directory
@@ -23,8 +27,8 @@
     from the matching section of CHANGELOG.md when omitted.
 
 .PARAMETER Verify
-    Check that the URL the manifest points at is actually live. Run this *after*
-    uploading the installer — see the order the script prints.
+    Check that the URL the manifest points at is actually live. Run this AFTER
+    uploading the installer, in the order the script prints.
 
 .EXAMPLE
     .\scripts\release.ps1
@@ -50,7 +54,7 @@ $version = $config.version
 $base = $config.plugins.updater.endpoints[0] -replace '/updates/latest\.json$', ''
 
 if (-not $config.plugins.updater.pubkey) {
-    throw "plugins.updater.pubkey is empty in tauri.conf.json — this build cannot ship updates."
+    throw "plugins.updater.pubkey is empty in tauri.conf.json. This build cannot ship updates."
 }
 
 Write-Host "version   $version"
@@ -75,21 +79,16 @@ if (-not $installer) {
 
 $sig = "$($installer.FullName).sig"
 if (-not (Test-Path $sig)) {
-    throw @"
-$($installer.Name) has no .sig beside it, so it cannot be offered as an update.
-
-The build needs both the signing key and the release config:
-  `$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content `$HOME\.klar\updater.key -Raw
-  `$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = "..."
-  npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.json
-"@
+    $name = $installer.Name
+    throw "$name has no .sig beside it, so it cannot be offered as an update. The build needs both the signing key and the release config: . .\scripts\env.ps1 -Sign, then npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.json"
 }
 
-# Read, never retype. `-Raw` then trim: the file is one long line and a trailing
+# Read, never retype. -Raw then trim: the file is one long line and a trailing
 # newline is not part of the signature.
 $signature = (Get-Content $sig -Raw).Trim()
 if ($signature.Length -lt 64) {
-    throw "the signature in $sig looks truncated ($($signature.Length) characters)."
+    $length = $signature.Length
+    throw "the signature in $sig looks truncated: $length characters."
 }
 
 if (-not $Notes) {
@@ -114,9 +113,9 @@ $manifest = [ordered]@{
     pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     platforms = [ordered]@{
         # Only Windows. macOS updates need a Developer ID before they can work
-        # at all: an unsigned bundle loses its Accessibility permission on every
-        # update, and Klar without Accessibility cannot see the hotkey or insert
-        # text. See the README.
+        # at all: an unsigned bundle gets a new signature on every build, macOS
+        # ties the Accessibility permission to that signature, and Klar without
+        # Accessibility can neither see the hotkey nor insert text.
         "windows-x86_64" = [ordered]@{
             signature = $signature
             url       = $url
@@ -127,38 +126,45 @@ $manifest = [ordered]@{
 $out = Join-Path $root "dist-release"
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 $manifestPath = Join-Path $out "latest.json"
-$manifest | ConvertTo-Json -Depth 5 | Set-Content $manifestPath -Encoding utf8NoBOM
 
+# WriteAllText rather than Set-Content: -Encoding utf8NoBOM does not exist in
+# Windows PowerShell 5.1, and its plain "utf8" writes a BOM that some servers
+# and parsers hand straight through into the first key.
+$json = $manifest | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText($manifestPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+
+$megabytes = [math]::Round($installer.Length / 1MB)
 Write-Host ""
-Write-Host "installer $($installer.Name)  $([math]::Round($installer.Length / 1MB)) MB"
+Write-Host "installer $($installer.Name)  $megabytes MB"
 Write-Host "manifest  $manifestPath"
 Write-Host ""
 
 if ($Verify) {
     Write-Host "checking $url"
     try {
-        $head = Invoke-WebRequest -Uri $url -Method Head -MaximumRedirection 3
+        $head = Invoke-WebRequest -Uri $url -Method Head -MaximumRedirection 3 -UseBasicParsing
         Write-Host "  $($head.StatusCode)  $($head.Headers['Content-Length']) bytes" -ForegroundColor Green
     }
     catch {
         Write-Host "  the installer is not there yet: $($_.Exception.Message)" -ForegroundColor Yellow
-        Write-Host "  upload it before the manifest, or clients get a manifest promising a missing file."
+        Write-Host "  upload it before the manifest, or clients get a manifest naming a missing file."
         exit 1
     }
 
     $live = "$base/updates/latest.json"
     Write-Host "checking $live"
     try {
-        $served = Invoke-WebRequest -Uri $live -Headers @{ "Cache-Control" = "no-cache" }
+        $served = Invoke-WebRequest -Uri $live -Headers @{ "Cache-Control" = "no-cache" } -UseBasicParsing
         $servedVersion = ($served.Content | ConvertFrom-Json).version
         $cache = $served.Headers['Cache-Control']
         Write-Host "  serving $servedVersion  (Cache-Control: $cache)" -ForegroundColor Green
+
         if ($servedVersion -ne $version) {
-            Write-Host "  still the old manifest — upload it, then purge Cloudflare for this URL." -ForegroundColor Yellow
+            Write-Host "  still the old manifest. Upload it, then purge Cloudflare for this URL." -ForegroundColor Yellow
         }
         if ($cache -match "immutable|max-age=(\d{5,})") {
             Write-Host "  this manifest is cached for a long time. Nobody will see the next release." -ForegroundColor Red
-            Write-Host "  /updates/ needs its own nginx location — see README." -ForegroundColor Red
+            Write-Host "  /updates/ needs its own nginx location. See the README." -ForegroundColor Red
         }
     }
     catch {
@@ -167,8 +173,8 @@ if ($Verify) {
     exit 0
 }
 
-# Order matters. A manifest that names a file which is not there yet is a
-# broken update for everybody who checks in that window.
+# Order matters. A manifest naming a file which is not there yet is a broken
+# update for everybody who checks in that window.
 Write-Host "Upload in this order:" -ForegroundColor Cyan
 Write-Host "  scp `"$($installer.FullName)`" root@getklar.net:/path/to/downloads/"
 Write-Host "  scp `"$manifestPath`" root@getklar.net:/path/to/updates/"

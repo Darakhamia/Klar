@@ -7,21 +7,25 @@
     terminal has none of them. Forgetting one does not produce a message about
     the thing that is missing:
 
-    - **MSVC environment.** Ninja, unlike MSBuild, does not find the compiler
-      by itself. Without it CMake reports that cl.exe cannot compile a test
+    - MSVC environment. Ninja, unlike MSBuild, does not find the compiler by
+      itself. Without it CMake reports that cl.exe cannot compile a test
       program.
-    - **CMAKE_GENERATOR=Ninja.** MSBuild builds ggml's shader compiler as a
-      nested project and puts a scratch tree under it that runs past MAX_PATH.
-      Without this the failure is `MSB4018 ... exceeds the OS max path limit`,
-      three thousand lines into a log.
-    - **A short CARGO_TARGET_DIR.** Same limit, less headroom in `release\`
-      than in `debug\`.
-    - **The updater signing key**, for release builds only. Without it the
+    - CMAKE_GENERATOR=Ninja. MSBuild builds ggml's shader compiler as a nested
+      project and puts a scratch tree under it that runs past MAX_PATH. Without
+      this the failure is "MSB4018 ... exceeds the OS max path limit", three
+      thousand lines into a log.
+    - A short CARGO_TARGET_DIR. Same limit, and less headroom in release\ than
+      in debug\.
+    - The updater signing key, for release builds only. Without it the
       installer is produced and then not signed, and the run ends on a line
       about a private key rather than about the build.
 
-    Dot-source it — `. .\scripts\env.ps1` — so the variables land in the
-    current shell rather than in a child process that exits.
+    Dot-source it, ". .\scripts\env.ps1", so the variables land in the current
+    shell rather than in a child process that exits.
+
+    ASCII only, and no cmdlet newer than PowerShell 5.1: Windows PowerShell
+    reads .ps1 files as ANSI rather than UTF-8, so one em dash in a string
+    arrives as mojibake and takes the quoting with it.
 
 .PARAMETER Sign
     Also load the updater signing key, for a build that will be published.
@@ -46,8 +50,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Already inside a Developer Shell? `cl.exe` on PATH is the honest test —
-# entering one twice appends to PATH and eventually breaks it.
+# Already inside a Developer Shell? cl.exe on PATH is the honest test. Entering
+# one twice appends to PATH and eventually breaks it.
 if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
     $vs = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools"
     if (-not (Test-Path $vs)) {
@@ -72,11 +76,11 @@ Write-Host "target    $env:CARGO_TARGET_DIR"
 Write-Host "generator $env:CMAKE_GENERATOR"
 
 if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
-    Write-Host "ninja     NOT FOUND — winget install Ninja-build.Ninja" -ForegroundColor Red
+    Write-Host "ninja     NOT FOUND. winget install Ninja-build.Ninja" -ForegroundColor Red
 }
 
 if (-not $env:VULKAN_SDK) {
-    Write-Host "vulkan    VULKAN_SDK is not set — see the README" -ForegroundColor Yellow
+    Write-Host "vulkan    VULKAN_SDK is not set. See the README" -ForegroundColor Yellow
 }
 else {
     Write-Host "vulkan    $env:VULKAN_SDK"
@@ -90,7 +94,7 @@ if ($Sign) {
     $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $Key -Raw
 
     # Read rather than take as a parameter: an argument ends up in the shell
-    # history, and this one cannot be rotated without breaking updates for
+    # history, and this secret cannot be rotated without breaking updates for
     # every copy already installed.
     $secure = Read-Host "Updater key password (empty if you set none)" -AsSecureString
     $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD =
