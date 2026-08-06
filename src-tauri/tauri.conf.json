@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Klar",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "app.klar.desktop",
   "build": {
     "frontendDist": "../dist",
@@ -56,9 +56,12 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://klar.app/updates/latest.json"
+        "https://getklar.net/updates/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGNjg3MTIwMjg0M0MzMkIKUldRcncwTW9JSEZvUHg1L3Z0R1AwN3BoRGJ5aTV2Y2FkNzNES202dE5jR0RWZmh6V0VwbENIdDEK"
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGNjg3MTIwMjg0M0MzMkIKUldRcncwTW9JSEZvUHg1L3Z0R1AwN3BoRGJ5aTV2Y2FkNzNES202dE5jR0RWZmh6V0VwbENIdDEK",
+      "windows": {
+        "installMode": "passive"
+      }
     }
   },
   "bundle": {

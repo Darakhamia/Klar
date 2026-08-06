@@ -2348,7 +2348,7 @@ dependencies = [
 
 [[package]]
 name = "klar"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "directories",
  "klar-core",
@@ -2369,7 +2369,7 @@ dependencies = [
 
 [[package]]
 name = "klar-cli"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -2382,7 +2382,7 @@ dependencies = [
 
 [[package]]
 name = "klar-core"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cpal",
  "directories",
@@ -2405,7 +2405,7 @@ dependencies = [
 
 [[package]]
 name = "klar-platform"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "serde",
  "thiserror 2.0.19",

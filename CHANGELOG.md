@@ -13,7 +13,7 @@ Newest first.
 
 ---
 
-## Unreleased
+## 0.3.0
 
 **Updates.** Klar checks for a newer version at startup and installs one from
 Settings → General → Updates. The check asks the update server for one file and
@@ -24,9 +24,14 @@ An update replaces the previous Klar rather than sitting beside it — the
 installer keys off the app identifier and a directory named after the product,
 neither of which carries a version.
 
-Needs a signing keypair and a manifest on the site before it does anything; see
-the README. A build without them says "no update channel configured" rather than
-failing to start.
+The channel is `https://getklar.net/updates/latest.json`.
+`scripts/release.ps1` builds the manifest from what the build produced rather
+than from anything typed: a mis-copied signature breaks updates for everybody at
+once, and it does it only after each of them has downloaded the whole installer.
+
+**0.1.0 and 0.2.0 cannot update themselves** — they were built before any of
+this existed and have nothing to check with. Install 0.3.0 by hand once; from
+there on it is a button.
 
 ---
 

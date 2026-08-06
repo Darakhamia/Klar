@@ -25,3 +25,7 @@
 # Local overrides
 .env
 .env.local
+
+# Release artefacts. The manifest is generated from a build, not written by
+# hand, and it names a signature — nothing here belongs in git.
+/dist-release

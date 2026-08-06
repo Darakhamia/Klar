@@ -427,26 +427,47 @@ npm run tauri build -- --features vulkan --config src-tauri/tauri.release.conf.j
 That extra config turns on `createUpdaterArtifacts`, which produces a `.sig`
 beside the installer. Without it you get an ordinary installer and no update.
 
-**Two: a manifest on the site.** `plugins.updater.endpoints` points at a JSON
-file — change the host there to yours. It looks like this, and the `signature`
-is the contents of the `.sig` file the build produced:
+**Two: a manifest on the site.** `scripts/release.ps1` writes it from what the
+build actually produced — run it after building and it prints the upload order:
+
+```powershell
+.\scripts\release.ps1            # writes dist-release\latest.json
+# scp the installer, then the manifest, then purge Cloudflare
+.\scripts\release.ps1 -Verify    # confirms both are live and not over-cached
+```
+
+Never type the `signature` field. A single mis-copied character out of a few
+hundred breaks updates for everybody, and it breaks them late: the manifest
+parses, the version shows, the installer downloads in full, and only then is it
+refused. The script reads it out of the `.sig` file instead, and refuses to
+write a manifest whose installer does not match the version in
+`tauri.conf.json`.
+
+The manifest it produces:
 
 ```json
 {
-  "version": "0.2.0",
-  "notes": "The dictionary, history and statistics.",
+  "version": "0.3.0",
+  "notes": "Updates. Klar checks for a newer version at startup…",
   "pub_date": "2026-08-06T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "<contents of Klar_0.2.0_x64-setup.exe.sig>",
-      "url": "https://klar.app/downloads/Klar_0.2.0_x64-setup.exe"
+      "signature": "<contents of Klar_0.3.0_x64-setup.exe.sig>",
+      "url": "https://getklar.net/downloads/Klar_0.3.0_x64-setup.exe"
     }
   }
 }
 ```
 
 Klar compares `version` against its own and offers the update when it is newer.
-Serve it over HTTPS.
+
+**The manifest must not be cached the way the installers are.** Versioned
+installers are immutable and deserve a year; the manifest is the one file that
+changes, and a long `Cache-Control` on it means nobody ever sees another
+release. It needs its own nginx location — around a minute, with
+`must-revalidate` — and, behind Cloudflare, a cache rule that bypasses the edge
+for `/updates/*`. `release.ps1 -Verify` reads the header back and says so if it
+is wrong.
 
 **Publish the Vulkan build to the update channel.** There is one
 `windows-x86_64` key and two flavours of installer, and Vulkan is the one that
