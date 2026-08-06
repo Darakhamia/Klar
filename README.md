@@ -24,10 +24,12 @@ M5, and the cloud path for machines without a usable GPU. Both say so in the
 interface rather than being offered and doing nothing.
 
 **Not only NVIDIA.** The GPU backend is a compile-time choice, so there is a
-CUDA build and a Vulkan one, and Vulkan covers AMD, Intel and NVIDIA alike. Both
-produce an installer; the Vulkan one carries no redistributable runtime at all.
-Neither has been installed on a machine that has never had a developer toolchain
-on it, which is what M7 actually asks. What
+CUDA build and a Vulkan one, and Vulkan covers AMD, Intel and NVIDIA alike. The
+Vulkan installer carries no redistributable runtime at all, and **it has now
+been installed and used on three machines by three people** — a desktop
+RTX 5070 Ti, a laptop RTX 3060, and an AMD Radeon RX 7900 XT. Two of those had
+never had a developer toolchain on them, which is M7's actual criterion, and the
+AMD card is the one the Vulkan work existed for. What
 mattered more than adding it was noticing when it is wrong: a CUDA build on a
 machine with an AMD card starts, works, silently runs on the CPU and is ten
 times slower. Klar reads ggml's device registry at load and names the device

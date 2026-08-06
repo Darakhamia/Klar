@@ -100,7 +100,14 @@ macOS: hardened runtime, Developer ID signing, notarization, DMG. Windows: code 
 
 **Done when:** a build installs and runs on a machine that has never had a developer toolchain on it.
 
-Windows, part done. What that criterion was actually failing on was not signing:
+**Windows passed.** The Vulkan installer has been installed and used by three
+people on three machines — a desktop RTX 5070 Ti, a laptop RTX 3060, and an AMD
+Radeon RX 7900 XT — two of which had never had a developer toolchain on them.
+That is the criterion, on the backend that can actually be handed to somebody.
+Unsigned, so SmartScreen asks first; auto-update and all of macOS remain unbuilt,
+and the notes below still describe what it took to get here.
+
+What that criterion was actually failing on was not signing:
 the installer would not *start* on a machine without the CUDA Toolkit, because
 whisper.cpp links the CUDA runtime dynamically and Windows gives up at load time
 with a missing-DLL box, before any of our code can explain itself. `build.rs`
