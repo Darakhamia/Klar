@@ -371,6 +371,13 @@ Two installers built from the same version produce the same filename, so rename
 them (`Klar_x.y.z_x64-setup.exe` → `…-cuda-setup.exe`, `…-vulkan-setup.exe`)
 before publishing both.
 
+**Bump the version with the change that goes out.** Klar is unsigned and has no
+auto-update, so an installer lives on somebody's machine until they replace it
+by hand, and the number in its filename is the only way anyone can tell which
+Klar they are running. It lives in `Cargo.toml`, `package.json` and
+`src-tauri/tauri.conf.json`, which must agree — the last one names the
+installer. [`CHANGELOG.md`](CHANGELOG.md) says what each one changed.
+
 ### Why the CUDA runtime is bundled
 
 whisper.cpp links `cudart`, `cublas` and `cublasLt` dynamically, so a machine
