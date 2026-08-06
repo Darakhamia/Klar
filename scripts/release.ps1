@@ -155,8 +155,21 @@ if ($Verify) {
     Write-Host "checking $live"
     try {
         $served = Invoke-WebRequest -Uri $live -Headers @{ "Cache-Control" = "no-cache" } -UseBasicParsing
-        $servedVersion = ($served.Content | ConvertFrom-Json).version
+        $type = $served.Headers['Content-Type']
         $cache = $served.Headers['Cache-Control']
+
+        # A site with a single-page fallback answers a missing file with 200 and
+        # the landing page, not 404. The updater would then try to parse HTML as
+        # JSON and report something about the server being unreachable. Caught
+        # here, where it can be named.
+        if ($type -notmatch "json") {
+            Write-Host "  200, but Content-Type is '$type', not JSON." -ForegroundColor Red
+            Write-Host "  The manifest is not there and the site answered with a page instead." -ForegroundColor Red
+            Write-Host "  /updates/ must 404 on a missing file rather than fall through to index.html." -ForegroundColor Red
+            exit 1
+        }
+
+        $servedVersion = ($served.Content | ConvertFrom-Json).version
         Write-Host "  serving $servedVersion  (Cache-Control: $cache)" -ForegroundColor Green
 
         if ($servedVersion -ne $version) {
