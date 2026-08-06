@@ -316,6 +316,20 @@ npm run lint
 
 ```powershell
 npm install
+. .\scripts\env.ps1                      # MSVC, Ninja, a short target directory
+npm run tauri build -- --features vulkan
+```
+
+**Dot-source `env.ps1`, every new terminal.** Four things have to be set before
+a build works on Windows and a fresh shell has none of them; forgetting one
+fails thousands of lines into a log, with a message about something else. The
+script sets them and says what it found. Dot-source it (`. .\scripts\env.ps1`)
+rather than running it, or the variables land in a child process that then
+exits.
+
+The CUDA build, for an NVIDIA-only installer:
+
+```powershell
 npm run tauri build -- --features cuda --config src-tauri/tauri.cuda.conf.json
 ```
 
