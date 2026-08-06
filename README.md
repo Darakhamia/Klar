@@ -28,6 +28,12 @@ with the application it went into, and deleting is per row or all at once. The
 totals survive clearing the history: the text is the private part, how much you
 used the app is not.
 
+**Updates arrive by themselves.** Klar asks getklar.net at startup and installs
+a newer version from Settings → General → Updates. Every update is
+signature-checked before it runs. The channel is published and serving; what it
+has not done yet is carry an actual update from one version to the next, which
+is the only test that means anything — see the release process below.
+
 Not built: the cloud path for machines without a usable GPU. It says so in the
 interface rather than being offered and doing nothing.
 
