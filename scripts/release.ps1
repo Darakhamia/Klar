@@ -39,7 +39,17 @@
 param(
     [string]$Bundle,
     [string]$Notes,
-    [switch]$Verify
+    [switch]$Verify,
+
+    # The server's own address, not the domain. getklar.net is proxied through
+    # Cloudflare, which resolves to Cloudflare and forwards HTTP and HTTPS only:
+    # scp to the hostname reaches a machine that does not answer on port 22.
+    [string]$Host_ = "65.108.92.69",
+
+    # Symlinks on the server, standing in for the Coolify bind mounts under
+    # /data/coolify/applications/<id>/.
+    [string]$DownloadsPath = "/root/klar-dl/",
+    [string]$UpdatesPath = "/root/klar-up/"
 )
 
 $ErrorActionPreference = "Stop"
@@ -189,9 +199,9 @@ if ($Verify) {
 # Order matters. A manifest naming a file which is not there yet is a broken
 # update for everybody who checks in that window.
 Write-Host "Upload in this order:" -ForegroundColor Cyan
-Write-Host "  scp `"$($installer.FullName)`" root@getklar.net:/path/to/downloads/"
-Write-Host "  scp `"$manifestPath`" root@getklar.net:/path/to/updates/"
+Write-Host "  scp `"$($installer.FullName)`" root@${Host_}:$DownloadsPath"
+Write-Host "  scp `"$manifestPath`" root@${Host_}:$UpdatesPath"
+Write-Host "  ssh root@${Host_} `"chmod 644 $DownloadsPath* $UpdatesPath*`""
 Write-Host ""
-Write-Host "Then purge the Cloudflare cache for $base/updates/latest.json,"
-Write-Host "and confirm it landed:"
+Write-Host "Then confirm it landed:"
 Write-Host "  .\scripts\release.ps1 -Verify"
