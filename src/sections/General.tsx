@@ -260,7 +260,10 @@ function Updates({
       label="Updates"
       hint={
         found
-          ? `Version ${found.version} is available. You have ${found.current}.`
+          ? // The notes travel in the manifest and were being thrown away here,
+            // which left the only question anybody has before installing --
+            // what changes? -- answered by a version number.
+            `Version ${found.version} is available. You have ${found.current}.${found.notes ? ` ${found.notes}` : ""}`
           : (said ??
             "Checking asks the update server for one file. It carries Klar's version and nothing about what you dictated. Every update is signature-checked before it runs.")
       }

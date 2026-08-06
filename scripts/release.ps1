@@ -57,9 +57,15 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $conf = Join-Path $root "src-tauri\tauri.conf.json"
 
+# ReadAllText, not Get-Content -Raw, everywhere a file is read here. Windows
+# PowerShell 5.1 decodes as the ANSI codepage unless there is a BOM, so an em
+# dash read that way arrives as two characters and is then written back out as
+# UTF-8 -- mojibake, in a field shown to the user. .NET's ReadAllText defaults
+# to UTF-8 and detects a BOM if there is one.
+
 # The version comes from the file that names the installer, so the manifest
 # cannot claim a version the build did not produce.
-$config = Get-Content $conf -Raw | ConvertFrom-Json
+$config = [System.IO.File]::ReadAllText($conf) | ConvertFrom-Json
 $version = $config.version
 $base = $config.plugins.updater.endpoints[0] -replace '/updates/latest\.json$', ''
 
@@ -122,14 +128,30 @@ if (-not $Notes) {
     # written once rather than twice.
     $changelog = Join-Path $root "CHANGELOG.md"
     if (Test-Path $changelog) {
-        $text = Get-Content $changelog -Raw
-        if ($text -match "(?ms)^## $([regex]::Escape($version))\s*\r?\n(.+?)(?=^## |\z)") {
+        $text = [System.IO.File]::ReadAllText($changelog)
+        # The first paragraph only. Squashing a whole section and cutting it at
+        # 400 characters ends mid-sentence, and the reader is deciding whether
+        # to install something -- half a thought is worse than a short one. The
+        # opening paragraph of each entry is written to be the summary anyway.
+        if ($text -match "(?ms)^## $([regex]::Escape($version))\s*\r?\n\s*(.+?)(?=\r?\n\s*\r?\n|^## |\z)") {
             $Notes = ($Matches[1] -replace '\s+', ' ').Trim()
-            if ($Notes.Length -gt 400) { $Notes = $Notes.Substring(0, 397) + "..." }
+            # Markdown emphasis is markup, and nothing renders it here: the
+            # updater hands this string to the interface as plain text.
+            $Notes = $Notes -replace '\*\*([^*]+)\*\*', '$1'
+            $Notes = $Notes -replace '`([^`]+)`', '$1'
+            $Notes = $Notes -replace '\[([^\]]+)\]\([^)]+\)', '$1'
+            if ($Notes.Length -gt 400) {
+                $cut = $Notes.Substring(0, 400)
+                $space = $cut.LastIndexOf(' ')
+                if ($space -gt 300) { $cut = $cut.Substring(0, $space) }
+                $Notes = $cut.TrimEnd('.', ',', ' ') + "..."
+            }
         }
     }
 }
 if (-not $Notes) { $Notes = "See getklar.net for what changed." }
+
+Write-Host "notes     $Notes"
 
 $url = "$base/downloads/$($installer.Name)"
 
