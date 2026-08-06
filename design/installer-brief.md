@@ -4,6 +4,12 @@ Hand this to a design session. It is written to be pasted whole — the
 constraints at the end are the part that makes the output usable rather than a
 picture of an installer.
 
+> **Answered.** The assets are in `src-tauri/installer` and wired into
+> `tauri.conf.json`; the master artwork and the reasoning are in
+> `design/Klar Installer.dc.html` and `design/Klar Installer Assets.dc.html`.
+> The onboarding window came back unchanged, which was one of the permitted
+> answers. This brief stays for the next time the artwork is revisited.
+
 ---
 
 ## What Klar is

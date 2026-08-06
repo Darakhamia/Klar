@@ -391,10 +391,9 @@ Two installers built from the same version produce the same filename, so rename
 them (`Klar_x.y.z_x64-setup.exe` → `…-cuda-setup.exe`, `…-vulkan-setup.exe`)
 before publishing both.
 
-**Bump the version with the change that goes out.** Klar is unsigned and has no
-auto-update, so an installer lives on somebody's machine until they replace it
-by hand, and the number in its filename is the only way anyone can tell which
-Klar they are running. It lives in `Cargo.toml`, `package.json` and
+**Bump the version with the change that goes out.** The updater compares it
+against the manifest and does nothing when they match, so a change shipped
+without a bump reaches nobody. It lives in `Cargo.toml`, `package.json` and
 `src-tauri/tauri.conf.json`, which must agree — the last one names the
 installer. [`CHANGELOG.md`](CHANGELOG.md) says what each one changed.
 
@@ -531,46 +530,28 @@ identifier must never change.
 
 ### Code signing
 
-Unsigned, Windows SmartScreen shows "Windows protected your PC" on first run.
-Everything except the certificate is already configured — see the section above
-this one for the digest and timestamp settings, and note that the timestamp is
-the part people forget, without which a signature dies with its certificate.
-
-Getting a certificate is the part that costs money, and the landscape changed:
-since 2023 the private key must live on a hardware token or in a cloud HSM, so a
-`.pfx` file you can copy around is no longer issued.
-
-- **Azure Trusted Signing** is the cheapest way in — roughly the price of a
-  coffee per month rather than several hundred a year — and it needs no token in
-  the post. It signs through a cloud service, so it fits a build script. It
-  requires a verified organisation, or an individual identity with three years
-  of history.
-- **A traditional OV certificate** from Sectigo, DigiCert or similar runs a few
-  hundred a year and arrives on a USB token, which means release builds happen
-  on a machine with that token plugged in.
-
-Neither makes SmartScreen quiet immediately: it trusts reputation, which
-accumulates over installs. An EV certificate skips that wait and costs more.
-
-With a certificate in the Windows store, set its thumbprint in
-`bundle.windows.certificateThumbprint`:
+Unsigned, Windows SmartScreen shows "Windows protected your PC" on first run and
+names the publisher as unknown. Everything except the certificate is configured;
+`scripts\sign.ps1` connects one when it exists.
 
 ```powershell
-Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Format-List Subject, Thumbprint
+.\scripts\sign.ps1 -Rehearse      # self-signed, proves the path works
+.\scripts\sign.ps1 -Thumbprint <hex>
+.\scripts\sign.ps1 -Azure "https://weu.codesigning.azure.net,<account>,<profile>"
+.\scripts\sign.ps1 -Verify C:\kv\release\bundle\nsis\Klar_0.3.1_x64-setup.exe
 ```
 
-Token- and HSM-based certificates never appear there; those use
-`bundle.windows.signCommand` instead, pointing at the vendor's signing tool.
+Each writes `src-tauri/tauri.signing.conf.json`, gitignored, passed to the build
+as a second `-c`. The rehearsal is worth ten minutes before spending anything:
+it proves signtool is found and both the executable and the installer come out
+signed and timestamped, which is everything a real certificate then inherits.
 
-A self-signed certificate is worth ten minutes before buying one. It proves the
-whole pipeline signs, timestamps and installs, and it changes nothing about
-SmartScreen — which trusts issuers, not signatures.
+[`docs/signing.md`](docs/signing.md) is the rest — which certificate to buy,
+what each one costs, and the honest answer to what signing does to that blue
+box, which is *not* "makes it go away tomorrow".
 
-```powershell
-$cert = New-SelfSignedCertificate -Type CodeSigning -Subject "CN=Klar Test" `
-  -CertStoreLocation Cert:\CurrentUser\My
-$cert.Thumbprint
-```
+Do not confuse this with the updater signature above. That one is minisign, it
+already works, and it is the one that actually protects anybody.
 
 ### Still to do before this goes to anyone else
 

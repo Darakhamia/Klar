@@ -80,7 +80,12 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["English", "Russian"]
+        "languages": ["English", "Russian"],
+        "headerImage": "installer/header.bmp",
+        "sidebarImage": "installer/sidebar.bmp",
+        "uninstallerHeaderImage": "installer/header.bmp",
+        "installerIcon": "installer/installer.ico",
+        "uninstallerIcon": "installer/uninstaller.ico"
       },
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",

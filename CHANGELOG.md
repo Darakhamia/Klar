@@ -34,6 +34,18 @@ The two model descriptions were rewritten to say what they were hiding: the
 quantised default trades accuracy first on rare words, which is exactly the
 case a person hunting a dictionary fix is in.
 
+**The installer has artwork.** A header, a sidebar, and its own icons, from the
+design session briefed in `design/installer-brief.md`. The sidebar says where
+speech goes rather than what Klar does, because it is read in the ten seconds
+after Windows has said it does not know who wrote this.
+
+Klar is still not code-signed, so that warning still appears.
+`scripts\sign.ps1` and `docs/signing.md` are the groundwork: a self-signed
+rehearsal that proves the build signs and timestamps correctly, one command to
+point it at a real certificate when there is one, and a straight answer about
+what signing does to SmartScreen — which is not what most people think they are
+buying.
+
 ---
 
 ## 0.3.0

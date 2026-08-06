@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-8e3f2e58-9960-48cc-8001-18ab32255873/styles.css">
+<script src="_ds/modernist-8e3f2e58-9960-48cc-8001-18ab32255873/_ds_bundle.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#f3f2f2; }
+  a { color:var(--color-accent-700); text-decoration:none; }
+  a:hover { color:var(--color-accent); }
+</style>
+</helmet>
+<div style="background:var(--color-bg); color:var(--color-text); font-family:var(--font-body); padding:var(--space-8) var(--space-8) 96px; min-height:100vh; -webkit-font-smoothing:antialiased;">
+  <div style="max-width:1180px; margin:0 auto; display:flex; flex-direction:column; gap:var(--space-8);">
+
+    <header style="display:flex; flex-direction:column; gap:var(--space-4); padding-bottom:var(--space-6); border-bottom:2px solid var(--color-text);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-accent-700);">Klar — Windows installer</div>
+      <h1 style="font-family:var(--font-heading); font-weight:800; font-size:50px; line-height:0.98; letter-spacing:-0.03em; margin:0; max-width:22ch;">Four seconds, after a security warning.</h1>
+      <p style="margin:0; max-width:70ch; font-size:15px; line-height:1.6; color:var(--color-neutral-800); text-wrap:pretty;">NSIS owns the window: the fonts, the buttons, the grey. Three images and an icon are the whole surface. Everything below is drawn at real size, in the order the user meets it.</p>
+    </header>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Rationale — what the sidebar says</div>
+      <div style="display:grid; grid-template-columns:196px 1fr; gap:48px; align-items:start;">
+        <img src="assets/klar-sidebar.png" alt="Klar installer sidebar, 164 by 314" style="width:164px; height:314px; display:block; border:2px solid var(--color-text);">
+        <div style="display:flex; flex-direction:column; gap:var(--space-4); max-width:68ch;">
+          <p style="margin:0; font-size:16px; line-height:1.55; letter-spacing:-0.01em;">The screen before this one is Windows saying it does not recognise the publisher, and the user had to click <em>More info</em> to get past it. They are not looking for a welcome. They are looking for evidence that the thing they were sent is what they were told it was.</p>
+          <p style="margin:0; font-size:14px; line-height:1.65; color:var(--color-neutral-800);">So the sidebar says three checkable things and nothing else. The name, which should match the link they were sent. What the app does, in the words they would use themselves — hold a key, speak, release, the words land where you were typing. And where the speech goes, stated flatly: it never leaves this PC. That last line is the only answer to the warning they just dismissed, and it is worth more than any amount of reassurance about how safe the installer is.</p>
+          <p style="margin:0; font-size:14px; line-height:1.65; color:var(--color-neutral-800);">The picture above the copy is the product's own behaviour: a red waveform on the top row, resolving down four rows into one clean line of text. It is the only illustration in the installer, it is made of the same rectangles as the app, and it survives being resampled at 150% scaling because it is nothing but flat blocks.</p>
+          <div style="display:flex; gap:var(--space-6); padding-top:var(--space-2); border-top:2px solid var(--color-divider);">
+            <div style="font-size:12px; line-height:1.6; color:var(--color-neutral-700); max-width:26ch;"><strong style="font-weight:700; color:var(--color-text);">Not said:</strong> thank you for choosing Klar, welcome to the Klar setup wizard, version numbers, or a licence nobody reads.</div>
+            <div style="font-size:12px; line-height:1.6; color:var(--color-neutral-700); max-width:26ch;"><strong style="font-weight:700; color:var(--color-text);">Smallest type:</strong> 11 px at 600 weight. Nothing thinner than a 3 px rule anywhere in the panel.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Screen 0 — what actually comes first</div>
+      <div style="display:grid; grid-template-columns:1fr 320px; gap:var(--space-6); align-items:start;">
+        <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:36px; display:flex; justify-content:center;">
+          <div style="width:420px; background:#f0f0f0; border:1px solid #cfcfcf; box-shadow:0 8px 28px rgba(0,0,0,0.28); font-family:'Segoe UI', system-ui, sans-serif; color:#1b1b1b;">
+            <div style="padding:26px 26px 18px; display:flex; flex-direction:column; gap:12px;">
+              <div style="font-size:19px; font-weight:400; color:#003e92;">Windows protected your PC</div>
+              <div style="font-size:12px; line-height:1.5; color:#333;">Microsoft Defender SmartScreen prevented an unrecognised app from starting. Running this app might put your PC at risk.</div>
+              <div style="font-size:12px; color:#0067b8; text-decoration:underline; cursor:pointer;">More info</div>
+            </div>
+            <div style="padding:14px 26px 20px; background:#f0f0f0; display:flex; justify-content:flex-end;">
+              <div style="font-size:12px; padding:6px 26px; background:#e1e1e1; border:1px solid #adadad;">Don't run</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:var(--space-3); padding-top:var(--space-2);">
+          <div style="font-size:15px; font-weight:700;">Unsigned, so this is the first screen</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.65; color:var(--color-neutral-700);">The Run button only appears after <em>More info</em>. Nothing in the installer can change this, and pretending it did not happen is what makes most installers feel evasive.</p>
+          <p style="margin:0; font-size:12.5px; line-height:1.65; color:var(--color-neutral-700);">Two consequences for the design: the welcome page has to look deliberate within one glance, and the words on it have to be specific rather than warm.</p>
+          <div style="padding:var(--space-3); background:var(--color-surface); border-left:4px solid var(--color-accent); font-size:12.5px; line-height:1.6;">Worth pricing a code-signing certificate against this screen. It is the largest single drop-off in the product.</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">The four pages — real size, real NSIS chrome</div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:var(--space-6);">
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:var(--space-6); display:flex; justify-content:center;">
+            <div style="width:499px; background:#f0f0f0; border:1px solid #999; box-shadow:0 10px 30px rgba(0,0,0,0.25); font-family:'Segoe UI', system-ui, sans-serif; color:#1b1b1b;">
+              <div style="height:30px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; padding:0 10px; gap:8px;">
+                <div style="width:16px; height:16px; background:#201e1d; display:flex; align-items:center; justify-content:center; gap:2px;">
+                  <div style="width:2px; height:5px; background:#ec3013;"></div>
+                  <div style="width:2px; height:10px; background:#ec3013;"></div>
+                  <div style="width:2px; height:7px; background:#ec3013;"></div>
+                </div>
+                <div style="font-size:12px;">Klar Setup</div>
+                <div style="margin-left:auto; display:flex; gap:2px; font-size:11px; color:#5a5a5a;">
+                  <div style="width:34px; text-align:center;">—</div>
+                  <div style="width:34px; text-align:center;">□</div>
+                  <div style="width:34px; text-align:center;">✕</div>
+                </div>
+              </div>
+              <div style="display:flex; height:314px; background:#ffffff;">
+                <img src="assets/klar-sidebar.png" alt="" style="width:164px; height:314px; display:block; flex-shrink:0;">
+                <div style="flex:1; padding:26px 24px; display:flex; flex-direction:column;">
+                  <div style="font-size:20px; font-weight:600; margin-bottom:14px;">Install Klar</div>
+                  <div style="font-size:12px; line-height:1.6; color:#333; max-width:40ch;">Klar installs for you only. It does not ask for an administrator, it does not add anything else, and it replaces any earlier version in place.</div>
+                  <div style="font-size:12px; line-height:1.6; color:#333; max-width:40ch; margin-top:12px;">It takes about four seconds.</div>
+                  <div style="margin-top:auto; font-size:11px; color:#666;">C:\Users\you\AppData\Local\Klar &nbsp;·&nbsp; 96 MB</div>
+                </div>
+              </div>
+              <div style="height:48px; background:#f0f0f0; border-top:1px solid #dcdcdc; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 12px;">
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad; color:#8a8a8a;">Back</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #2b2b2b;">Install</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad;">Cancel</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:14px; font-weight:700;">1 — Welcome</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">No destination chooser, no components, no licence. The body answers the three questions the warning raised: who it installs for, what it touches, how long it takes.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:var(--space-6); display:flex; justify-content:center;">
+            <div style="width:499px; background:#f0f0f0; border:1px solid #999; box-shadow:0 10px 30px rgba(0,0,0,0.25); font-family:'Segoe UI', system-ui, sans-serif; color:#1b1b1b;">
+              <div style="height:30px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; padding:0 10px; gap:8px;">
+                <div style="width:16px; height:16px; background:#201e1d; display:flex; align-items:center; justify-content:center; gap:2px;">
+                  <div style="width:2px; height:5px; background:#ec3013;"></div>
+                  <div style="width:2px; height:10px; background:#ec3013;"></div>
+                  <div style="width:2px; height:7px; background:#ec3013;"></div>
+                </div>
+                <div style="font-size:12px;">Klar Setup</div>
+                <div style="margin-left:auto; display:flex; gap:2px; font-size:11px; color:#5a5a5a;">
+                  <div style="width:34px; text-align:center;">—</div>
+                  <div style="width:34px; text-align:center;">□</div>
+                  <div style="width:34px; text-align:center;">✕</div>
+                </div>
+              </div>
+              <div style="height:57px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; justify-content:space-between;">
+                <div style="padding:0 20px; display:flex; flex-direction:column; gap:3px;">
+                  <div style="font-size:12px; font-weight:600;">Installing</div>
+                  <div style="font-size:11px; color:#555;">Klar is being installed.</div>
+                </div>
+                <img src="assets/klar-header.png" alt="" style="width:150px; height:57px; display:block;">
+              </div>
+              <div style="height:257px; background:#ffffff; padding:26px 24px; display:flex; flex-direction:column; gap:12px;">
+                <div style="height:18px; background:#e6e6e6; border:1px solid #bcbcbc; overflow:hidden;">
+                  <div style="width:64%; height:100%; background:#06b025;"></div>
+                </div>
+                <div style="font-size:11px; color:#333;">Extracting speech model…</div>
+                <div style="margin-top:auto; font-size:11px; line-height:1.6; color:#666; max-width:52ch;">The 800 MB speech model is not in this installer. Klar downloads it once, on first run, and works offline afterwards.</div>
+              </div>
+              <div style="height:48px; background:#f0f0f0; border-top:1px solid #dcdcdc; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 12px;">
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad; color:#8a8a8a;">Back</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad; color:#8a8a8a;">Next</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad;">Cancel</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:14px; font-weight:700;">2 — Progress</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">The header strip is the only branding here and it is 150 px of wordmark. The green bar is Windows' own; NSIS will not restyle it, so nothing pretends otherwise.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:var(--space-6); display:flex; justify-content:center;">
+            <div style="width:499px; background:#f0f0f0; border:1px solid #999; box-shadow:0 10px 30px rgba(0,0,0,0.25); font-family:'Segoe UI', system-ui, sans-serif; color:#1b1b1b;">
+              <div style="height:30px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; padding:0 10px; gap:8px;">
+                <div style="width:16px; height:16px; background:#201e1d; display:flex; align-items:center; justify-content:center; gap:2px;">
+                  <div style="width:2px; height:5px; background:#ec3013;"></div>
+                  <div style="width:2px; height:10px; background:#ec3013;"></div>
+                  <div style="width:2px; height:7px; background:#ec3013;"></div>
+                </div>
+                <div style="font-size:12px;">Klar Setup</div>
+                <div style="margin-left:auto; display:flex; gap:2px; font-size:11px; color:#5a5a5a;">
+                  <div style="width:34px; text-align:center;">—</div>
+                  <div style="width:34px; text-align:center;">□</div>
+                  <div style="width:34px; text-align:center;">✕</div>
+                </div>
+              </div>
+              <div style="display:flex; height:314px; background:#ffffff;">
+                <img src="assets/klar-sidebar.png" alt="" style="width:164px; height:314px; display:block; flex-shrink:0;">
+                <div style="flex:1; padding:26px 24px; display:flex; flex-direction:column;">
+                  <div style="font-size:20px; font-weight:600; margin-bottom:14px;">Klar is running</div>
+                  <div style="font-size:12px; line-height:1.6; color:#333; max-width:40ch;">It sits in the tray, next to the clock. Hold <strong>Ctrl + Space</strong> anywhere, say something, and let go.</div>
+                  <div style="display:flex; align-items:center; gap:10px; margin-top:18px; padding:10px 12px; border:1px solid #cfcfcf; background:#fafafa;">
+                    <div style="width:16px; height:16px; background:#201e1d; display:flex; align-items:center; justify-content:center; gap:2px; flex-shrink:0;">
+                      <div style="width:2px; height:5px; background:#ec3013;"></div>
+                      <div style="width:2px; height:10px; background:#ec3013;"></div>
+                      <div style="width:2px; height:7px; background:#ec3013;"></div>
+                    </div>
+                    <div style="font-size:11px; line-height:1.5; color:#333;">This is the icon to look for. It turns red while you are speaking.</div>
+                  </div>
+                  <label style="display:flex; align-items:center; gap:8px; margin-top:16px; font-size:12px; cursor:pointer;">
+                    <input type="checkbox" checked="checked" style="width:13px; height:13px; margin:0; accent-color:#ec3013;">
+                    Set up the microphone and hotkey now
+                  </label>
+                  <div style="margin-top:auto; font-size:11px; color:#666;">Takes under a minute. You can change everything later.</div>
+                </div>
+              </div>
+              <div style="height:48px; background:#f0f0f0; border-top:1px solid #dcdcdc; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 12px;">
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad; color:#8a8a8a;">Back</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #2b2b2b;">Finish</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad; color:#8a8a8a;">Cancel</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:14px; font-weight:700;">3 — Finish</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">A tray app is invisible by default, so this page shows the icon at the size it will actually appear and names the key. This is the last screen guaranteed to be read.</p>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--space-3);">
+          <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:var(--space-6); display:flex; justify-content:center;">
+            <div style="width:499px; background:#f0f0f0; border:1px solid #999; box-shadow:0 10px 30px rgba(0,0,0,0.25); font-family:'Segoe UI', system-ui, sans-serif; color:#1b1b1b;">
+              <div style="height:30px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; padding:0 10px; gap:8px;">
+                <div style="width:16px; height:16px; background:#201e1d; display:flex; align-items:center; justify-content:center; gap:2px;">
+                  <div style="width:2px; height:5px; background:#ec3013;"></div>
+                  <div style="width:2px; height:10px; background:#ec3013;"></div>
+                  <div style="width:2px; height:7px; background:#ec3013;"></div>
+                </div>
+                <div style="font-size:12px;">Klar Setup</div>
+                <div style="margin-left:auto; display:flex; gap:2px; font-size:11px; color:#5a5a5a;">
+                  <div style="width:34px; text-align:center;">—</div>
+                  <div style="width:34px; text-align:center;">□</div>
+                  <div style="width:34px; text-align:center;">✕</div>
+                </div>
+              </div>
+              <div style="height:57px; background:#ffffff; border-bottom:1px solid #dcdcdc; display:flex; align-items:center; justify-content:space-between;">
+                <div style="padding:0 20px; display:flex; flex-direction:column; gap:3px;">
+                  <div style="font-size:12px; font-weight:600;">Installation did not finish</div>
+                  <div style="font-size:11px; color:#555;">Nothing was changed on this PC.</div>
+                </div>
+                <img src="assets/klar-header.png" alt="" style="width:150px; height:57px; display:block;">
+              </div>
+              <div style="height:257px; background:#ffffff; padding:26px 24px; display:flex; flex-direction:column; gap:14px;">
+                <div style="font-size:12px; line-height:1.6; color:#333; max-width:52ch;">Setup could not write to <span style="font-family:Consolas, monospace; font-size:11.5px;">C:\Users\you\AppData\Local\Klar</span>.</div>
+                <div style="font-size:12px; line-height:1.6; color:#333; max-width:52ch;">An older copy of Klar is still running. Right-click the Klar icon in the tray, choose Quit, then run setup again.</div>
+                <div style="padding:10px 12px; background:#f7f7f7; border-left:3px solid #ec3013; font-size:11px; line-height:1.6; color:#555; max-width:52ch;">If there is no Klar icon in the tray, restart the PC and run setup again. Nothing needs to be uninstalled first.</div>
+                <div style="margin-top:auto; font-size:11px; color:#666;">Error 5 · access denied · log written to your desktop</div>
+              </div>
+              <div style="height:48px; background:#f0f0f0; border-top:1px solid #dcdcdc; display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:0 12px;">
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad;">Save log</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #2b2b2b;">Try again</div>
+                <div style="font-size:12px; padding:5px 22px; background:#e1e1e1; border:1px solid #adadad;">Close</div>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:var(--space-1);">
+            <div style="font-size:14px; font-weight:700;">4 — Error</div>
+            <p style="margin:0; font-size:12.5px; line-height:1.6; color:var(--color-neutral-700);">States what happened, what it did not do, and the two steps that fix it. The error code is at the bottom for the one person in a hundred who will quote it.</p>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">The moment after Finish</div>
+      <div style="display:grid; grid-template-columns:1fr 340px; gap:var(--space-6); align-items:start;">
+        <div style="background:var(--color-neutral-300); border:2px solid var(--color-text); padding:36px 36px 0; display:flex; flex-direction:column; align-items:flex-end; gap:0;">
+          <div style="width:100%; max-width:560px; display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
+            <div style="width:300px; background:#201e1d; color:#f8f4f4; border:2px solid #f8f4f4; padding:16px; display:flex; flex-direction:column; gap:10px; font-family:var(--font-body);">
+              <div style="font-family:var(--font-heading); font-size:17px; font-weight:800; letter-spacing:-0.02em; line-height:1.15;">Klar is here.</div>
+              <div style="font-size:12.5px; line-height:1.5; color:#bab6b6;">Hold <span style="font-weight:700; color:#f8f4f4;">Ctrl + Space</span>, say “this is my first sentence”, and let go.</div>
+              <div style="display:flex; align-items:center; gap:8px; padding-top:4px;">
+                <div style="height:3px; width:28px; background:#ec3013;"></div>
+                <div style="font-size:10px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; color:#9b9797;">Try it here first</div>
+              </div>
+            </div>
+            <div style="width:0; height:0; border-left:8px solid transparent; border-right:8px solid transparent; border-top:9px solid #f8f4f4; margin-right:52px;"></div>
+            <div style="width:100%; height:40px; background:#1f1f1f; display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 14px; box-sizing:border-box;">
+              <div style="display:flex; align-items:center; gap:2px; height:16px;">
+                <div style="width:2px; height:5px; background:#ec3013;"></div>
+                <div style="width:2px; height:10px; background:#ec3013;"></div>
+                <div style="width:2px; height:7px; background:#ec3013;"></div>
+              </div>
+              <div style="font-family:'Segoe UI', system-ui, sans-serif; font-size:11px; color:#e8e8e8; line-height:1.2; text-align:right;">14:02<br>06/08/2026</div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:var(--space-3); padding-top:var(--space-2);">
+          <div style="font-size:15px; font-weight:700;">One callout, anchored to the icon</div>
+          <p style="margin:0; font-size:12.5px; line-height:1.65; color:var(--color-neutral-700);">The first-run window opens as it does today. The addition is this: a callout pinned to the tray icon, so the user's eye is sent to the place the app now lives rather than to a window that will close and never be seen again.</p>
+          <p style="margin:0; font-size:12.5px; line-height:1.65; color:var(--color-neutral-700);">It gives them a sentence to say. Being handed the words removes the pause where a person tries to think of something to dictate and quietly gives up.</p>
+          <p style="margin:0; font-size:12.5px; line-height:1.65; color:var(--color-neutral-700);">It shows once, dismisses on the first successful dictation, and never returns.</p>
+          <div style="padding:var(--space-3); background:var(--color-surface); border-left:4px solid var(--color-accent); font-size:12.5px; line-height:1.6;">The existing first-run window is left as it is. It already ends with a live dictation and a raw-versus-typed comparison, which is the strongest thing in the flow — it needs pointing at, not redesigning.</div>
+        </div>
+      </div>
+    </section>
+
+    <section style="display:flex; flex-direction:column; gap:var(--space-4);">
+      <div style="font-size:11px; font-weight:700; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-neutral-600); padding-bottom:var(--space-3); border-bottom:2px solid var(--color-divider);">Files delivered</div>
+      <table class="table">
+        <thead>
+          <tr><th>Asset</th><th>Size</th><th>File</th><th>NSIS</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="font-weight:600;">Header</td><td>150 × 57</td><td>assets/klar-header.dib · .png</td><td style="font-size:12px; color:var(--color-neutral-700);">MUI_HEADERIMAGE_BITMAP</td></tr>
+          <tr><td style="font-weight:600;">Sidebar</td><td>164 × 314</td><td>assets/klar-sidebar.dib · .png</td><td style="font-size:12px; color:var(--color-neutral-700);">MUI_WELCOMEFINISHPAGE_BITMAP</td></tr>
+          <tr><td style="font-weight:600;">Installer icon</td><td>256 / 48 / 32 / 16</td><td>assets/klar.ico</td><td style="font-size:12px; color:var(--color-neutral-700);">MUI_ICON</td></tr>
+          <tr><td style="font-weight:600;">Uninstaller icon</td><td>256 / 48 / 32 / 16</td><td>assets/klar-uninstall.ico</td><td style="font-size:12px; color:var(--color-neutral-700);">MUI_UNICON</td></tr>
+        </tbody>
+      </table>
+      <div style="display:flex; gap:var(--space-6); flex-wrap:wrap; padding-top:var(--space-2);">
+        <div style="font-size:12.5px; line-height:1.65; color:var(--color-neutral-700); max-width:42ch;"><strong style="color:var(--color-text); font-weight:700;">Rename <code>.dib</code> to <code>.bmp</code> before building.</strong> The two files are already 24-bit BMP byte for byte — bottom-up, no alpha, 54-byte header, exactly what NSIS wants. Only the extension differs, because this environment will not write a <code>.bmp</code>.</div>
+        <div style="font-size:12.5px; line-height:1.65; color:var(--color-neutral-700); max-width:42ch;"><strong style="color:var(--color-text); font-weight:700;">Both icons carry four sizes.</strong> 16 and 32 are drawn by hand at those pixel counts rather than downscaled, so the three bars stay separate in the tray and in Explorer at 125% and 150% scaling.</div>
+      </div>
+    </section>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

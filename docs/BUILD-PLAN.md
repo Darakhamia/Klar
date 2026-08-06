@@ -155,9 +155,17 @@ budget. Two things came out of that:
 
 Signing is configured and unsigned. The digest and the RFC 3161 timestamp URL
 are set — the timestamp being the part people forget, without which a signature
-dies with its certificate — and only the thumbprint is missing, because a
-certificate has to be bought and issued to a named person. `README.md` has the
-one line that turns it on, and the self-signed rehearsal worth doing first.
+dies with its certificate — and only the certificate is missing, because one has
+to be bought and issued to a named person. `scripts\sign.ps1` connects it in one
+command, and does the self-signed rehearsal worth running first.
+[`signing.md`](signing.md) is the decision: what each option costs, and the
+honest answer to what any of them does to SmartScreen, which is not what people
+expect they are buying.
+
+The installer has its artwork — `src-tauri/installer`, from the design session
+briefed in `design/installer-brief.md`. The sidebar says where speech goes
+rather than what the app does, on the reasoning that it is read immediately
+after Windows has said it does not know who wrote this.
 
 Log export is done and it is not a nicety: Klar has no crash reporter and sends
 nothing anywhere, so a problem on somebody's machine reaches nobody unless they
@@ -166,6 +174,93 @@ can find the log in one click. Settings → Diagnostics → Show log file.
 Not done: auto-update, which needs a release channel to update from and a
 keypair, and building it before either exists is scaffolding; and all of macOS,
 whose platform backend is still a stub.
+
+---
+
+## M8 — The dictionary that fills itself
+
+Today the dictionary only holds what somebody sat down and typed into it, which
+means it holds almost nothing: the words Klar gets wrong are discovered one at a
+time, mid-sentence, in the middle of doing something else, and by the time
+there is a spare minute they have been forgotten. The goal of this milestone is
+that using Klar for a month makes it better at *your* words without anybody
+maintaining a list.
+
+### What cannot be done, first
+
+**Klar cannot see you fix a word.** Text is injected into another application
+and the story ends there. Watching what happens afterwards means reading other
+applications' windows or their keystrokes, and the privacy rules forbid it in
+plain terms — nothing about what is dictated leaves the pipeline, and a
+background process that reads whatever the user types next is exactly the thing
+this app must never be. So the literal request — notice when a word is corrected
+by hand — is off the table, and any design that quietly needs it is wrong.
+
+**Whisper cannot be trained here.** Fine-tuning a 574 MB model on a laptop, per
+user, is not a feature; it is a research project with a GPU bill. Nothing in
+this milestone changes a model's weights. What improves is which words the model
+is *told to expect* before it starts, and that turns out to be enough.
+
+### The three signals that are actually available
+
+All three read the SQLite file Klar already writes. None adds a capture path,
+and none sends anything anywhere.
+
+**1. What polish already rewrites.** Every dictation stores `raw` — whisper's
+transcript — and `text` — what was finally inserted. When the same token in
+`raw` becomes the same different token in `text` across many dictations, the
+polish model has been quietly making the same correction over and over. That is
+a dictionary entry, already written, that nobody has been shown. It costs one
+query and no new plumbing, and it is the strongest of the three because the
+correction was made by something that had the whole sentence for context.
+
+**2. Saying it again.** A dictation followed within a few seconds by a second
+one that is textually close is somebody repeating themselves because the first
+attempt came out wrong. The pair of transcripts brackets the word that failed.
+Timestamps are already stored; the diff is the candidate.
+
+**3. Correcting a row in History.** Make history rows editable. This is the only
+unambiguous signal of the three — the user is deliberately saying "it should
+have been this" — and the one nobody will use, because visiting a history pane
+to fix a word that has already been sent is not a thing people do. Build it
+anyway: it is cheap, and it is the ground truth the other two are guessing at.
+Without it there is no way to tell whether the guesses are any good.
+
+### Ranking the prompt by what gets used
+
+The dictionary already biases whisper through `initial_prompt`, and that prompt
+has a hard budget — `PROMPT_LIMIT`, 800 characters. A dictionary larger than the
+budget is silently truncated today, which means the fiftieth word taught does
+nothing at all.
+
+Record which entries actually fire, and spend the budget on the terms this
+person says, most-recent and most-frequent first. This is the part that makes
+the claim "it gets better the longer you use it" literally true rather than
+aspirational, and it is a sort, not a model.
+
+### Rules this milestone does not get to break
+
+- **A suggestion is a proposal, never an edit.** The dictionary changes what the
+  user's text says. Software that rewrites somebody's words on a statistical
+  hunch, without asking, is the failure mode this whole product is one step
+  away from. Suggestions appear in the Dictionary pane with the evidence — the
+  dictations they came from, and how many — and do nothing until accepted.
+- **Rejecting a suggestion is permanent.** Proposing the same word twice is
+  worse than never proposing it.
+- **Clearing history clears the suggestions.** Otherwise "clear history" leaves
+  behind a list of words derived from the text it claimed to delete, which is
+  the same information wearing a different hat.
+- **The mining runs on stored rows, not in the dictation path.** M3's budget is
+  not to be spent on this. Off the hot path entirely — on a timer, or when the
+  Dictionary pane opens.
+- **It must be switchable off**, and off means no candidate table at all.
+
+**Done when:** after twenty dictations containing a name whisper reliably
+mangles, Klar proposes the correct spelling on its own; accepting the proposal
+fixes the next dictation; nothing is ever applied that was not accepted; and
+clearing the history leaves no trace of the words it was derived from. Every one
+of those is testable from `klar-cli` without a microphone, against a seeded
+database.
 
 ---
 

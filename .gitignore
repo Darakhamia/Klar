@@ -29,3 +29,8 @@
 # Release artefacts. The manifest is generated from a build, not written by
 # hand, and it names a signature — nothing here belongs in git.
 /dist-release
+
+# Code-signing overlay, written by scripts/sign.ps1. It names a certificate
+# thumbprint or an Azure account, both of which belong to one machine and one
+# subscription rather than to the project.
+/src-tauri/tauri.signing.conf.json
