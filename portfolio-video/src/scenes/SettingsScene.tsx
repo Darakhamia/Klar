@@ -90,11 +90,14 @@ export function SettingsScene({ layout }: { layout: Layout }) {
 
   const settle = ramp(frame, T.toDark, 24, resolve);
   const leave = ramp(frame, T.toEnd, 12, resolve);
-  const dim = ramp(frame, T.sweep - 12, 18, resolve);
+  const dim = ramp(frame, T.voiceFocus, 24, resolve);
+  const chrome = ramp(frame, T.voiceFocus, 12, resolve);
+  const list = ramp(frame, T.listFocus, 24, resolve) * (1 - ramp(frame, T.listRelease, 16, resolve));
+  const listChrome = ramp(frame, T.listFocus, 12, resolve) * (1 - ramp(frame, T.listRelease, 16, resolve));
 
   const focus = {
     "--kv-dim": String(1 - 0.86 * dim),
-    "--kv-dim-chrome": String(1 - 0.65 * dim),
+    "--kv-dim-chrome": String(1 - 0.8 * chrome),
     position: "absolute",
     inset: 0,
     opacity: frame >= T.toVoice ? 1 : 0,
@@ -107,15 +110,22 @@ export function SettingsScene({ layout }: { layout: Layout }) {
           ref={root}
           style={{
             position: "absolute",
-            left: layout.window.x,
-            top: layout.window.y,
+            left: 0,
+            top: 0,
             width: 900,
             height: 652,
             opacity: 1 - leave,
             transform: `scale(${String(1.02 - 0.02 * settle - 0.02 * leave)})`,
           }}
         >
-          <SettingsWindow section="History" />
+          <div className="kv-focus-list" style={
+              {
+                "--kv-list-dim": String(1 - 0.78 * list),
+                "--kv-list-chrome": String(1 - 0.8 * listChrome),
+              } as CSSProperties
+            }>
+            <SettingsWindow section="History" />
+          </div>
           <div ref={voice} className="kv-focus" style={focus}>
             <SettingsWindow section="Voice" />
           </div>

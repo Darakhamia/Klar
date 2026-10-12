@@ -33,6 +33,50 @@ export interface Shot {
   zoom: number;
 }
 
+/** A camera position without a time: where it looks and how close. */
+export type Framing = Omit<Shot, "frame">;
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface View {
+  width: number;
+  height: number;
+}
+
+/** `box` fills `fill` of the frame along its tighter side, centred. */
+export function fit(view: View, box: Rect, fill: number): Framing {
+  const zoom = Math.min((fill * view.width) / box.width, (fill * view.height) / box.height);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2, zoom };
+}
+
+/** As `fit`, then raised so the box's bottom edge sits at `bottom` on screen —
+ * clear of the captions, which own the bottom-left corner. */
+export function fitAbove(view: View, box: Rect, fill: number, bottom: number): Framing {
+  const { x, zoom } = fit(view, box, fill);
+  return { x, y: box.y + box.height - (bottom - view.height / 2) / zoom, zoom };
+}
+
+/** Stage x `left`..`right` spans the frame exactly; stage y `top` is its top edge. */
+export function span(view: View, left: number, right: number, top: number): Framing {
+  const zoom = view.width / (right - left);
+  return { x: (left + right) / 2, y: top + view.height / 2 / zoom, zoom };
+}
+
+/** `zoom` close, centred on `x`, with stage y `top` at the frame's top edge. */
+export function from(view: View, x: number, top: number, zoom: number): Framing {
+  return { x, y: top + view.height / 2 / zoom, zoom };
+}
+
+/** The same framing a touch closer, for a hold that should not look frozen. */
+export const nudge = (framing: Framing, by = 1.012): Framing => ({ ...framing, zoom: framing.zoom * by });
+
+export const at = (frame: number, framing: Framing): Shot => ({ frame, ...framing });
+
 /** The camera at `frame`, eased between the shots either side of it. */
 export function aim(frame: number, shots: readonly Shot[]): Shot {
   const first = shots[0];

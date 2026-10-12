@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { useCurrentFrame } from "remotion";
-import { pillTop, type Layout } from "../format";
+import type { Layout } from "../format";
 import { ramp, resolve } from "../motion";
 import { SPOKEN } from "../speech";
 import { FPS, T } from "../timeline";
@@ -19,9 +19,9 @@ export function GhostLine({ layout }: { layout: Layout }) {
     <div
       className="kv-ghost"
       style={{
-        left: (layout.width - layout.ghostWidth) / 2,
-        width: layout.ghostWidth,
-        bottom: layout.height - pillTop(layout) + 18,
+        left: layout.mail.x + (layout.mail.width - layout.ghost.width) / 2,
+        width: layout.ghost.width,
+        top: layout.ghost.top,
         opacity: 1 - sink,
         transform: `translateY(${String(14 * sink)}px)`,
       }}

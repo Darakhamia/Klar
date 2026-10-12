@@ -11,7 +11,7 @@ import type { CSSProperties } from "react";
 import { useCurrentFrame } from "remotion";
 import { Overlay } from "../../../src/overlay/Overlay";
 import type { Engine, PipelineState } from "../../../src/overlay/useEngine";
-import { pillTop, type Layout } from "../format";
+import type { Layout } from "../format";
 import { ramp, resolve } from "../motion";
 import { barHeights, levelFor } from "../speech";
 import { CLEAN, FPS, RAW, T } from "../timeline";
@@ -67,7 +67,7 @@ export function Pill({ layout }: { layout: Layout }) {
     <div
       className="kv-pill-slot"
       style={{
-        top: pillTop(layout),
+        top: layout.pillTop,
         width: layout.width,
         opacity: enter * (1 - leave),
         transform: `translateY(${String(16 * (1 - enter) + 8 * leave)}px)`,
