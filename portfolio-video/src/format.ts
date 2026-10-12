@@ -35,6 +35,9 @@ export interface Layout {
   wordmark: number;
 }
 
+/** What the email scene's components need to know about where they are. */
+export type ComposeLayout = Pick<Layout, "width" | "height" | "mail" | "ghost" | "pillTop">;
+
 /**
  * Where things are inside the 900 × 652 settings window, measured from the
  * real History and Voice components as rendered here. If their CSS changes,

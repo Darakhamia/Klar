@@ -23,7 +23,8 @@ dependencies.
 ```sh
 npm install
 npm run studio     # preview and scrub the timeline in the browser
-npm run render     # render everything into out/
+npm run render       # render the two videos and their posters into out/
+npm run render:card  # render the portrait card into out/card/
 npm run typecheck
 ```
 
@@ -50,6 +51,17 @@ For the browser, it uses a Playwright headless shell if the machine has one, or
 | `klar-1x1.mp4`, `klar-1x1.webm` | 1080 × 1080, the same story recomposed for square |
 | `klar-poster.png`, `klar-poster-1x1.png` | The "Done" moment: clean text in the email, the pill reading Done |
 
+### The portrait card
+
+| File | What |
+|---|---|
+| `card/klar-card.png`, `card/klar-card.webp` | 1200 × 1600 still, the Done moment. The WebP is lossless, so the ground stays exactly `#f3f2f2` |
+| `card/klar-card-loop.mp4`, `card/klar-card-loop.webm` | 900 × 1200, an 8 s seamless loop of the same scene |
+
+The card is for the site's filmstrip carousel, which shows an unfocused card's
+top half only (`object-position: 50% 26%`): y 208–1008 of the still. The
+sentence and the pill both sit inside that band (`src/scenes/CardScene.tsx`).
+
 `out/` is ignored here. The rendered files are committed only on the
 `portfolio-video` branch, so about 13 MB of binaries never enters main's history.
 
@@ -61,5 +73,5 @@ For the browser, it uses a Playwright headless shell if the machine has one, or
 | `src/format.ts` | The two layouts, and each one's camera path, framed on boxes measured from the real components |
 | `src/speech.ts` | What is said and when; the waveform levels behind it |
 | `src/ui/Pill.tsx` | The real overlay driven frame by frame. Its CSS transitions are redrawn per frame (`video.css`), because a frame-by-frame renderer has no clock for them |
-| `src/scenes/` | The email, then History and Voice |
+| `src/scenes/` | The email, then History and Voice; and the portrait card |
 | `src/demo.ts` | The fake data. Nothing in it belongs to anyone |

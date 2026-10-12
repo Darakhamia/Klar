@@ -1,19 +1,19 @@
 import { Fragment } from "react";
 import { useCurrentFrame } from "remotion";
-import type { Layout } from "../format";
+import type { ComposeLayout } from "../format";
 import { ramp, resolve } from "../motion";
-import { SPOKEN } from "../speech";
-import { FPS, T } from "../timeline";
+import { SPOKEN, spokenAt } from "../speech";
+import { VIDEO_CUES, type Cues } from "../timeline";
 
 /**
  * What the speaker actually said, faint, word by word as it is said. Once the
  * key comes up the fillers go first, then the line sinks into the pill.
  */
-export function GhostLine({ layout }: { layout: Layout }) {
+export function GhostLine({ layout, cues = VIDEO_CUES }: { layout: ComposeLayout; cues?: Cues }) {
   const frame = useCurrentFrame();
-  if (frame < T.pillIn || frame > T.release + 24) return null;
+  if (frame < cues.pillIn || frame > cues.release + 24) return null;
 
-  const sink = ramp(frame, T.release + 6, 14, resolve);
+  const sink = ramp(frame, cues.release + 6, 14, resolve);
 
   return (
     <div
@@ -27,8 +27,8 @@ export function GhostLine({ layout }: { layout: Layout }) {
       }}
     >
       {SPOKEN.map((word, index) => {
-        const heard = ramp(frame, Math.round(word.start * FPS) + 2, 5, resolve);
-        const dropped = word.filler ? ramp(frame, T.release, 8) : 0;
+        const heard = ramp(frame, spokenAt(word, cues) + 2, 5, resolve);
+        const dropped = word.filler ? ramp(frame, cues.release, 8) : 0;
         return (
           <Fragment key={index}>
             <span

@@ -7,7 +7,8 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "typecheck": "tsc --noEmit",
-    "render": "bash scripts/render.sh"
+    "render": "bash scripts/render.sh",
+    "render:card": "bash scripts/render-card.sh"
   },
   "dependencies": {
     "@fontsource/archivo": "5.3.0",

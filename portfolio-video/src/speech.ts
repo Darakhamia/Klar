@@ -6,7 +6,7 @@
  * ghost line's words syllable by syllable, so the bars move with the words.
  */
 
-import { FPS, T } from "./timeline";
+import { FPS, VIDEO_CUES, type Cues } from "./timeline";
 
 export interface Word {
   text: string;
@@ -88,7 +88,7 @@ function peak(seconds: number, tick: number): number {
  * run against. Every level event restarts each bar's 130 ms transition from
  * wherever it had got to, exactly as the browser does.
  */
-export function barHeights(t: number): number[] {
+export function barHeights(t: number, cues: Cues = VIDEO_CUES): number[] {
   const from: number[] = new Array<number>(BARS).fill(3);
   const to: number[] = new Array<number>(BARS).fill(3);
   const peaks: number[] = [];
@@ -97,7 +97,7 @@ export function barHeights(t: number): number[] {
   for (let tick = 0; tick * TICK <= t; tick++) {
     const at = tick * TICK;
     const progress = Math.min(1, (at - changed) / FOLLOW);
-    peaks.push(peak(T.pillIn / FPS + at, tick));
+    peaks.push(peak(cues.speech.offset + cues.speech.rate * (cues.pillIn / FPS + at), tick));
     for (let bar = 0; bar < BARS; bar++) {
       const start = from[bar] ?? 3;
       from[bar] = start + ((to[bar] ?? 3) - start) * progress;
@@ -110,6 +110,10 @@ export function barHeights(t: number): number[] {
   const progress = Math.min(1, (t - changed) / FOLLOW);
   return from.map((start, bar) => start + ((to[bar] ?? 3) - start) * progress);
 }
+
+/** The frame, on a timeline with these cues, at which a word starts being said. */
+export const spokenAt = (word: Word, cues: Cues = VIDEO_CUES): number =>
+  Math.round(((word.start - cues.speech.offset) / cues.speech.rate) * FPS);
 
 /** The level that makes `Overlay.tsx` draw a bar `pixels` tall. */
 export const levelFor = (pixels: number): number => (pixels <= 3 ? 0 : (pixels / 30) ** 2);
