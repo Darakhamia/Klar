@@ -36,6 +36,8 @@ npm run typecheck
 5. Fails if any file is over 5 MB.
 
 To experiment with quality, change the encoder settings with `H264_CRF=… VP9_CRF=…`.
+Add `ENCODE_ONLY=1` to reuse the masters already in `build/` rather than drawing
+them again.
 
 For the browser, it uses a Playwright headless shell if the machine has one, or
 `$REMOTION_BROWSER` if set. Otherwise Remotion downloads its own.
@@ -49,14 +51,14 @@ For the browser, it uses a Playwright headless shell if the machine has one, or
 | `klar-poster.png`, `klar-poster-1x1.png` | The "Done" moment: clean text in the email, the pill reading Done |
 
 `out/` is ignored here. The rendered files are committed only on the
-`portfolio-video` branch, so about 10 MB of binaries never enters main's history.
+`portfolio-video` branch, so about 13 MB of binaries never enters main's history.
 
 ## Where things are
 
 | Path | What |
 |---|---|
 | `src/timeline.ts` | Every beat, in frames. Both formats share it |
-| `src/format.ts` | The two layouts, and the camera paths for each |
+| `src/format.ts` | The two layouts, and each one's camera path, framed on boxes measured from the real components |
 | `src/speech.ts` | What is said and when; the waveform levels behind it |
 | `src/ui/Pill.tsx` | The real overlay driven frame by frame. Its CSS transitions are redrawn per frame (`video.css`), because a frame-by-frame renderer has no clock for them |
 | `src/scenes/` | The email, then History and Voice |

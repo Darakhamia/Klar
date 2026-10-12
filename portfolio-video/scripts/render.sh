@@ -14,8 +14,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Rate factors, lowered until each file sits just inside the budget. Lower is
-# sharper and larger. Override from the environment to experiment.
-H264_CRF=${H264_CRF:-14}
+# sharper and larger. Override from the environment to experiment; with
+# ENCODE_ONLY=1 the masters already in build/ are reused rather than redrawn.
+H264_CRF=${H264_CRF:-16}
 VP9_CRF=${VP9_CRF:-20}
 BUDGET=5000000 # bytes, per file
 POSTER=270     # T.poster in src/timeline.ts
@@ -43,11 +44,12 @@ mkdir -p build out
 for pair in "Klar16x9 klar-16x9 klar-poster" "Klar1x1 klar-1x1 klar-poster-1x1"; do
   read -r id name poster <<<"$pair"
   frames="build/$name"
-  rm -rf "$frames"
-
-  echo "▸ $id: rendering masters"
-  npx remotion render "$bundle" "$id" "$frames" --sequence --image-format=png \
-    --image-sequence-pattern='[frame].[ext]' "${browser[@]}" --log=error
+  if [[ "${ENCODE_ONLY:-}" != 1 || ! -d "$frames" ]]; then
+    rm -rf "$frames"
+    echo "▸ $id: rendering masters"
+    npx remotion render "$bundle" "$id" "$frames" --sequence --image-format=png \
+      --image-sequence-pattern='[frame].[ext]' "${browser[@]}" --log=error
+  fi
 
   masters=("$frames"/*.png)
   pixels() { ffmpeg -v error -i "$1" -f rawvideo -pix_fmt rgb24 - | md5sum; }

@@ -88,14 +88,14 @@ whip-pans, zooms-through, blurs or bounces.
 | 1.0–2.0 | 30–59 | **Scene 1, compose.** A plain email window rises 16 px and fades in. *To: team@example.com · Subject: Today's release.* The body is empty, with a blinking caret. A slow push-in starts (1.00 → 1.04). | — |
 | 2.0 | 60 | The pill slides up 16 px and fades in, bottom-centre. It reads **LISTENING** in red, with the counter `0:00 — hold CTRL SPACE`. The live waveform shows 12 red bars. | **Just speak.** |
 | 2.4–6.2 | 72–186 | A **ghost line** appears word by word above the pill in faint neutral-500, timed to the waveform's syllables: *hey so um the build is green now uh can you can you merge it before the standup*. The counter ticks up to 0:04. | Just speak. |
-| 6.4 | 192 | **Scene 2, key release.** The pill reads **POLISHING**. It widens from 260 to 360, the bars flatten into grey blocks, and the raw transcript appears inside it. In the ghost line the fillers (*so, um, uh,* the repeated *can you*) fade first, then the line dissolves. The camera eases toward the pill (→ 1.10). | **Klar cleans it up.** |
+| 6.4 | 192 | **Scene 2, key release.** The pill reads **POLISHING**. It widens from 260 to 360, the bars flatten into grey blocks, and the raw transcript appears inside it. In the ghost line the fillers (*so, um, uh,* the repeated *can you*) fade first, then the line dissolves. The camera closes in on the pill. | **Klar cleans it up.** |
 | 7.5 | 225 | **Scene 3.** The pill reads **DONE** and its text changes to the clean sentence. | Klar cleans it up. |
-| 7.6–8.4 | 228–252 | The clean text lands in the email body, word by word: *Hey, the build is green now. Can you merge it before the standup?* The camera pans up to the body. | Klar cleans it up. |
+| 7.6–8.4 | 228–252 | The clean text lands in the email body, word by word: *Hey, the build is green now. Can you merge it before the standup?* The camera pulls back to the whole group: the email with its new sentence above the pill reading Done. | Klar cleans it up. |
 | 9.6 | 288 | The pill dismisses: it fades and drops 8 px. The finished email holds. | (caption out at 10.4) |
 | 11.0 | 330 | **A straight cut** to the dark History window, which settles from 102 % over 0.8 s. *(Planned as a crossfade; see section 6.)* | — |
-| 11.0–14.9 | 330–446 | **Scene 4, History (dark).** The real History panel shows the new entry on top: `09:41 AM · Mail · 812 ms · polished`, the clean text, and `heard: hey so um the build…` beneath it. Three older entries sit below. A slow push-in ends on the new entry. | **Every word, kept.** |
+| 11.0–14.9 | 330–446 | **Scene 4, History (dark).** The real History panel shows the new entry on top: `09:41 AM · Mail · 812 ms · polished`, the clean text, and `heard: hey so um the build…` beneath it. Three older entries sit below. The camera pushes in on the list column until the new entry and its `heard:` line fill the frame; the older entries dim behind the caption. It pulls back out before the sidebar click. | **Every word, kept.** |
 | 14.9 | 447 | **Scene 5.** The sidebar selection moves from History to Voice **in one frame**, as a click does in the app. *(Planned as a 6-frame crossfade; see section 6.)* | — |
-| 14.9–18.4 | 447–551 | **Settings → Voice.** The camera pushes in on the Processing row (`On this PC — NVIDIA GeForce RTX 4060 (cuda)`). The sentence *"Speech is recognised on this machine and never leaves it."* is marked left to right in `#FF563C`. The other rows dim to 14 %. | **Private. On-device.** |
+| 14.9–18.4 | 447–551 | **Settings → Voice.** The camera pushes in until the Processing row fills the frame edge to edge, `On this PC — NVIDIA GeForce RTX 4060 (cuda)` included. The sentence *"Speech is recognised on this machine and never leaves it."* is marked left to right in `#FF563C`. The other rows dim to 14 %. | **Private. On-device.** |
 | 18.4–18.9 | 552–565 | **Scene 6.** The window fades out on ink. | — |
 | 18.9 | 566 | A straight cut to the `#F3F2F2` ground. | — |
 | 18.9–19.6 | 568–589 | The end card rises in, staggered: the **Klar** wordmark (Archivo 800, −3 % tracking), a short red rule, *Speak. Get clean text.*, then `getklar.net` in the figure style. | — |
@@ -264,14 +264,41 @@ portfolio-video/
   That is the browser's default `padding-left` on the `<ul class="hist">`, which
   the app's CSS doesn't reset. The video shows it as the app draws it.
 
+### Second pass: framing for an 800 px card
+
+The video plays in a card about 800 px wide, where the first cut's UI was too
+small to read: the email window filled about a third of the 16:9 frame. Every
+scene is now framed on boxes measured from the rendered components
+(`src/format.ts`).
+
+- **Fill.** A subject fills roughly 70–80 % of the frame. The key moments get
+  push-ins: the ghost line and pill while listening, the pill while polishing,
+  the finished email, the `heard:` line, and the on-device sentence.
+- **Crops are either none or obvious.** A subject is whole with room around it,
+  or framed tight enough that the crop is plainly a close-up. In the pill
+  close-ups the email's foot shows across the top of the frame, its sides and
+  Send button well inside. The History and Voice close-ups run edge to edge
+  across the panel's content, with the sidebar rule and the window border just
+  out of frame.
+- **One group.** The email window, the ghost line and the pill are one centred
+  stack.
+- **Captions never sit on live text.** Whatever is under a caption is either
+  empty or already dimmed. The sidebar dims before a push sweeps its rule past
+  the caption.
+- **The listening line stays on one line.** In Archivo, `0:02 — hold CTRL SPACE`
+  needs 135 px and the 260 px pill gives it 128, so it broke before SPACE. The
+  shipped overlay fits it because it never loads Archivo: `src/overlay/main.tsx`
+  imports no font, so the pill falls back to the narrower system face. The video
+  keeps Archivo and takes 0.04 em of tracking off that line.
+
 ## 7. Output
 
 | File | Size |
 |---|---|
-| `klar-16x9.mp4`: H.264 High, CRF 14 | 3.18 MB |
-| `klar-16x9.webm`: VP9, two-pass, CRF 20 | 2.56 MB |
-| `klar-1x1.mp4` | 2.20 MB |
-| `klar-1x1.webm` | 1.84 MB |
+| `klar-16x9.mp4`: H.264 High, CRF 16 | 4.26 MB |
+| `klar-16x9.webm`: VP9, two-pass, CRF 20 | 3.95 MB |
+| `klar-1x1.mp4` | 2.53 MB |
+| `klar-1x1.webm` | 2.38 MB |
 | `klar-poster.png`, `klar-poster-1x1.png` | frame 270 |
 
 - **Format:** all files are 30 fps, 22.000 s and 660 frames, `yuv420p` tagged
