@@ -11,26 +11,24 @@ import type { CSSProperties } from "react";
 import { useCurrentFrame } from "remotion";
 import { Overlay } from "../../../src/overlay/Overlay";
 import type { Engine, PipelineState } from "../../../src/overlay/useEngine";
-import type { Layout } from "../format";
+import type { ComposeLayout } from "../format";
 import { ramp, resolve } from "../motion";
 import { barHeights, levelFor } from "../speech";
-import { CLEAN, FPS, RAW, T } from "../timeline";
+import { CLEAN, FPS, RAW, VIDEO_CUES, type Cues } from "../timeline";
 
 /** tokens.css: --duration-collapse, --duration-state; overlay.css: bar height. */
 const COLLAPSE = 0.42 * FPS;
 const STATE = 0.22 * FPS;
 const FALL = 0.13 * FPS;
 
-const RECORDED = (T.release - T.pillIn) / FPS;
-
-export function Pill({ layout }: { layout: Layout }) {
+export function Pill({ layout, cues = VIDEO_CUES }: { layout: ComposeLayout; cues?: Cues }) {
   const frame = useCurrentFrame();
-  if (frame < T.pillIn || frame > T.pillOut + 10) return null;
+  if (frame < cues.pillIn || frame > cues.pillOut + 10) return null;
 
   const state: PipelineState =
-    frame < T.release ? "recording" : frame < T.done ? "polishing" : "injecting";
-  const elapsed = Math.min((frame - T.pillIn) / FPS, RECORDED);
-  const live = barHeights(elapsed);
+    frame < cues.release ? "recording" : frame < cues.done ? "polishing" : "injecting";
+  const elapsed = Math.min((frame - cues.pillIn) / FPS, (cues.release - cues.pillIn) / FPS);
+  const live = barHeights(elapsed, cues);
 
   const engine: Engine = {
     state,
@@ -41,7 +39,7 @@ export function Pill({ layout }: { layout: Layout }) {
   };
 
   // Frames since the key came up: the pill widens, the bars flatten and grey.
-  const since = frame - T.release;
+  const since = frame - cues.release;
   const widen = since < 0 ? 0 : resolve(Math.min(1, since / COLLAPSE));
   const grey = since < 0 ? 0 : Math.min(1, since / STATE);
   const falling = since >= 0 && since < FALL;
@@ -60,8 +58,8 @@ export function Pill({ layout }: { layout: Layout }) {
     });
   }
 
-  const enter = ramp(frame, T.pillIn, 12, resolve);
-  const leave = ramp(frame, T.pillOut, 8, resolve);
+  const enter = ramp(frame, cues.pillIn, 12, resolve);
+  const leave = ramp(frame, cues.pillOut, 8, resolve);
 
   return (
     <div

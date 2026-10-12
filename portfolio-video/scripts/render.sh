@@ -21,24 +21,7 @@ VP9_CRF=${VP9_CRF:-20}
 BUDGET=5000000 # bytes, per file
 POSTER=270     # T.poster in src/timeline.ts
 
-# A browser for Remotion: $REMOTION_BROWSER, else a Playwright headless shell
-# if this machine has one, else Remotion downloads its own.
-browser=()
-if [[ -n "${REMOTION_BROWSER:-}" ]]; then
-  browser=(--browser-executable="$REMOTION_BROWSER")
-else
-  shell=$(compgen -G "${PLAYWRIGHT_BROWSERS_PATH:-/opt/pw-browsers}/chromium_headless_shell-*/*/headless_shell" | head -1 || true)
-  if [[ -n "$shell" ]]; then browser=(--browser-executable="$shell"); fi
-fi
-
-# Bundled outside the project: the app's `eslint .` would otherwise lint
-# Remotion's generated JavaScript.
-bundle=$(mktemp -d)
-trap 'rm -rf "$bundle"' EXIT
-npx remotion bundle src/index.ts --out-dir "$bundle" --log=error >/dev/null
-
-colour=(-colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv)
-convert="scale=out_color_matrix=bt709:out_range=tv:flags=lanczos+accurate_rnd+full_chroma_int,format=yuv420p"
+source scripts/common.sh
 
 mkdir -p build out
 for pair in "Klar16x9 klar-16x9 klar-poster" "Klar1x1 klar-1x1 klar-poster-1x1"; do
@@ -51,12 +34,8 @@ for pair in "Klar16x9 klar-16x9 klar-poster" "Klar1x1 klar-1x1 klar-poster-1x1";
       --image-sequence-pattern='[frame].[ext]' "${browser[@]}" --log=error
   fi
 
+  seamless "$frames"
   masters=("$frames"/*.png)
-  pixels() { ffmpeg -v error -i "$1" -f rawvideo -pix_fmt rgb24 - | md5sum; }
-  if [[ "$(pixels "${masters[0]}")" != "$(pixels "${masters[-1]}")" ]]; then
-    echo "error: $id does not loop — the first and last frames differ" >&2
-    exit 1
-  fi
   cp "${masters[$POSTER]}" "out/$poster.png"
 
   echo "▸ $id: encoding"
@@ -68,12 +47,6 @@ for pair in "Klar16x9 klar-16x9 klar-poster" "Klar1x1 klar-1x1 klar-poster-1x1";
   ffmpeg -v error -y "${input[@]}" "${vp9[@]}" -pass 1 -an -f webm /dev/null
   ffmpeg -v error -y "${input[@]}" "${vp9[@]}" -pass 2 "${colour[@]}" -an "out/$name.webm"
 
-  for file in "out/$name.mp4" "out/$name.webm"; do
-    size=$(stat -c %s "$file")
-    printf '  %-22s %5.2f MB\n' "$file" "$(echo "$size / 1000000" | bc -l)"
-    if ((size > BUDGET)); then
-      echo "error: $file is over the 5 MB budget; raise the CRF" >&2
-      exit 1
-    fi
-  done
+  within "out/$name.mp4" "$BUDGET"
+  within "out/$name.webm" "$BUDGET"
 done

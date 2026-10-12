@@ -307,3 +307,47 @@ scene is now framed on boxes measured from the rendered components
   `#F3F2F2`.
 - **Where to get them:** the `portfolio-video` branch. `README.md` explains how to
   re-render them.
+
+## 8. The portrait card
+
+A 3:4 card for the portfolio's filmstrip carousel. It shows the same moment as
+the poster, recomposed for portrait rather than cropped from 16:9.
+
+**Composition.**
+
+- A tall email compose window fills the card on the `#F3F2F2` ground.
+- The real overlay floats over the window just under the sentence it typed, as
+  the overlay floats over whatever application is in front.
+- There are no captions, no wordmark and no end card.
+
+**The clip.** An unfocused card is clipped to its top half at
+`object-position: 50% 26%`, which on a 1200 × 1600 card is the band from y 208
+to y 1008. Everything that matters sits inside it: the To and Subject rows,
+the sentence (set at 22 px) and the pill, which spans about 80 % of the card's
+width. The full card adds the window's title bar, its empty body and the Send
+footer.
+
+**The loop** (8 s, 240 frames) runs the same scene at a quicker pace:
+
+1. The pill comes in.
+2. Speech runs from 0.6 s to 4.0 s, with the ghost line building word by word.
+3. Polishing.
+4. Done, and the sentence lands.
+5. A 1.2 s hold.
+6. The pill leaves and the sentence clears, so the loop ends on the same empty
+   email it starts with.
+
+The caret holds steady in the loop, so the first and last frames are the same
+picture.
+
+| File | Size |
+|---|---|
+| `card/klar-card.png`: 1200 × 1600 | 174 KB |
+| `card/klar-card.webp`: 1200 × 1600, lossless | 40 KB |
+| `card/klar-card-loop.mp4`: 900 × 1200, H.264 CRF 14 | 174 KB |
+| `card/klar-card-loop.webm`: 900 × 1200, VP9 CRF 18 | 171 KB |
+
+The card plays through the same components as the video. Pill, GhostLine and
+MailWindow take their timing as `Cues`; the video's cues are the defaults.
+After that change, frames of both videos re-render pixel-identical to the
+final masters.

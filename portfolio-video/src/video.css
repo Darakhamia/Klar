@@ -171,6 +171,16 @@
   color: var(--color-neutral-600);
 }
 
+/* The card's window is the whole frame, so its sentence is set larger. */
+.kv-mail--card .kv-mail__field {
+  font-size: 15px;
+}
+
+.kv-mail--card .kv-mail__body {
+  font-size: 22px;
+  line-height: 1.45;
+}
+
 .kv-caret {
   display: inline-block;
   width: 2px;
