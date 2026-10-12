@@ -58,6 +58,15 @@
   color: var(--kv-status-colour) !important;
 }
 
+/* "0:02 — hold CTRL SPACE" on one line, as the shipped overlay shows it.
+ * In Archivo the line needs 135 px and the pill leaves it 128, so it broke
+ * before SPACE; the shipped overlay never loads Archivo and draws it in the
+ * narrower system face. A hair less tracking keeps the face and the line. */
+.kv-pill .pill[data-state="recording"] .pill__meta {
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 /* The bars fall to their resting 3 px over 130 ms rather than at once. */
 .kv-pill--falling .wave__bar:nth-child(1) { height: var(--kv-h0) !important; }
 .kv-pill--falling .wave__bar:nth-child(2) { height: var(--kv-h1) !important; }
@@ -219,6 +228,18 @@
 /* A recording shows no scrollbar; WebView2 draws an overlay one only on hover. */
 .kv-win .panel__body {
   scrollbar-width: none;
+}
+
+/* History: while the camera is on the newest entry, the others step back so
+ * the caption reads over them. */
+.kv-focus-list .hist__row:not(:first-child) {
+  opacity: var(--kv-list-dim);
+}
+
+/* The sidebar goes first, so its rule has faded before the camera sweeps it
+ * across the caption. */
+.kv-focus-list .nav {
+  opacity: var(--kv-list-chrome);
 }
 
 /* Settings → Voice: everything but the Processing row steps back. */

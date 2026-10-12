@@ -25,9 +25,15 @@ export const T = {
   toDark: 330,
   /** Voice replaces History in one frame, as a click on the sidebar does. */
   toVoice: 447,
-  /** The Processing row's first sentence is marked over `sweepFrames`. */
-  sweep: 474,
-  sweepFrames: 30,
+  /** The other History entries step back while the camera is on the newest. */
+  listFocus: 352,
+  listRelease: 426,
+  /** Voice: everything but the Processing row steps back as the camera goes in. */
+  voiceFocus: 466,
+  /** The Processing row's first sentence is marked over `sweepFrames`, once
+   * the camera has arrived on it. */
+  sweep: 506,
+  sweepFrames: 28,
   /** The settings window fades out on ink, then a cut to the light ground. */
   toEnd: 552,
   toLight: 566,
