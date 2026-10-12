@@ -4,8 +4,9 @@ Silent, seamless 22 s loop. 30 fps, 660 frames. The same timeline is used for tw
 compositions: 16:9 (1920 × 1080) and 1:1 (1080 × 1080). Each is laid out separately,
 not cropped from the other.
 
-Status: **waiting for approval.** Nothing is built yet. The decisions at the end
-need an answer, or a "go with your recommendations".
+Status: **approved and built.** Section 5 records the answers. Where the build
+departed from this plan after seeing it rendered, the table says so and section 6
+lists why.
 
 ---
 
@@ -91,13 +92,18 @@ whip-pans, zooms-through, blurs or bounces.
 | 7.5 | 225 | **Scene 3.** The pill reads **DONE** and its text changes to the clean sentence. | Klar cleans it up. |
 | 7.6–8.4 | 228–252 | The clean text lands in the email body, word by word: *Hey, the build is green now. Can you merge it before the standup?* The camera pans up to the body. | Klar cleans it up. |
 | 9.6 | 288 | The pill dismisses: it fades and drops 8 px. The finished email holds. | (caption out at 10.4) |
-| 10.8–11.2 | 324–335 | A calm 12-frame crossfade with a slight scale. The backdrop changes to ink `#201E1D`. | — |
-| 11.2–14.8 | 336–443 | **Scene 4, History (dark).** The real History panel shows the new entry on top: `09:41 AM · Mail · 812 ms · polished`, the clean text, and `heard: hey so um the build…` beneath it. Three older entries sit below. A slow push-in holds on the new entry. | **Every word, kept.** |
-| 14.8–15.0 | 444–449 | **Scene 5.** The sidebar selection moves from History to Voice. The app itself has no motion here, so the panel crossfades over 6 frames. | — |
-| 15.0–18.4 | 450–551 | **Settings → Voice.** The camera pushes in on the Processing row (`On this PC — NVIDIA GeForce RTX 4060 (cuda)`). A 2 px `#FF563C` underline draws left to right under *"Speech is recognised on this machine and never leaves it."* The other rows dim to about 35 %. | **Private. On-device.** |
-| 18.4–19.2 | 552–575 | **Scene 6.** The window recedes (scale 0.98, fade) and the ground crossfades from ink to `#F3F2F2`. | — |
-| 19.0–19.6 | 570–587 | The end card rises in, staggered: the **Klar** wordmark (Archivo 800, −3 % tracking), a short red rule, *Speak. Get clean text.*, then `getklar.net` in the label/figure style. | — |
-| 19.6–22.0 | 588–659 | Hold. **Frame 659 is identical to frame 0.** | — |
+| 11.0 | 330 | **A straight cut** to the dark History window, which settles from 102 % over 0.8 s. *(Planned as a crossfade; see section 6.)* | — |
+| 11.0–14.9 | 330–446 | **Scene 4, History (dark).** The real History panel shows the new entry on top: `09:41 AM · Mail · 812 ms · polished`, the clean text, and `heard: hey so um the build…` beneath it. Three older entries sit below. A slow push-in ends on the new entry. | **Every word, kept.** |
+| 14.9 | 447 | **Scene 5.** The sidebar selection moves from History to Voice **in one frame**, as a click does in the app. *(Planned as a 6-frame crossfade; see section 6.)* | — |
+| 14.9–18.4 | 447–551 | **Settings → Voice.** The camera pushes in on the Processing row (`On this PC — NVIDIA GeForce RTX 4060 (cuda)`). The sentence *"Speech is recognised on this machine and never leaves it."* is marked left to right in `#FF563C`. The other rows dim to 14 %. | **Private. On-device.** |
+| 18.4–18.9 | 552–565 | **Scene 6.** The window fades out on ink. | — |
+| 18.9 | 566 | A straight cut to the `#F3F2F2` ground. | — |
+| 18.9–19.6 | 568–589 | The end card rises in, staggered: the **Klar** wordmark (Archivo 800, −3 % tracking), a short red rule, *Speak. Get clean text.*, then `getklar.net` in the figure style. | — |
+| 19.6–22.0 | 590–659 | Hold. **Frame 659 is identical to frame 0**, and the render script checks it. | — |
+
+**Poster.** `klar-poster.png` and `klar-poster-1x1.png` are frame 270 (9.0 s), not
+frame 0. That is the Done moment: the clean sentence is in the email and the pill
+still reads Done.
 
 **Captions.** Archivo 800 at the `display-m` size, set bottom-left on the same left
 margin as the end card. Each one fades in with a 12 px rise (ease-out, 0.4 s) as its
@@ -217,33 +223,60 @@ portfolio-video/
 
 **Process, as you asked.**
 
-1. This document. ← **we are here**
+1. This document.
 2. On approval: build, render a half-resolution preview, and send you stills of
    5 key frames: listening, polishing, done with text in the email, History, and
    Voice highlighted.
-3. On your OK: render the final files to `out/`: `klar-16x9.mp4`, `klar-1x1.mp4`,
-   `klar-16x9.webm`, `klar-1x1.webm` and `klar-poster.png` (frame 0 of the 16:9).
+3. Render the final files to `out/`: `klar-16x9.mp4`, `klar-1x1.mp4`,
+   `klar-16x9.webm`, `klar-1x1.webm`, `klar-poster.png` and `klar-poster-1x1.png`.
 
-## 5. Decisions for you
+## 5. Decisions (answered)
 
-1. **Loop seam.** *Recommended:* the video opens on the end card for its first second
-   and the seam falls inside that still hold, so the loop is invisible. The poster,
-   which is the first frame, is the branded card. *Alternative:* open on the empty
-   compose window and fade the end card back to it in the last second. The poster then
-   shows the product, but the end card gets about 1 s less hold and the loop crosses a
-   transition.
-2. **The "Thinking" state.** The real app shows it for a few hundred ms between
-   Listening and Polishing. *Recommended:* leave it out, as in your storyboard. At
-   video pace a 0.3 s label reads as a glitch. *Alternative:* show it for 0.3 s, to be
-   strictly true to the code.
-3. **How the clean text arrives.** Klar actually pastes in one go, within a 50 ms
-   budget, so a slow typewriter would suggest it is slow. *Recommended:* the words land
-   left to right over about 0.8 s. That reads as typed and stays honest. Say if you
-   want a true per-character typewriter.
-4. **Fake data.** Are the app names (Mail / Notepad / Code), the
-   GPU string and the History entries above fine?
-5. **Committing the renders.** *Recommended:* commit `out/` to this branch, about
-   10–15 MB in all. This container is temporary, so that is how the files survive.
-   *Alternative:* I send you the files and keep `out/` out of git.
-6. **Extra poster.** Should I also add `klar-poster-1x1.png` for the square video's
-   `poster` attribute? *Recommended:* yes. It costs nothing.
+1. **Loop seam.** The video opens on the end card for one second, so the seam
+   falls inside its still hold. The poster is the Done moment (frame 270), not the
+   first frame.
+2. **Thinking state.** Left out.
+3. **Clean text.** It lands word by word, left to right, over 0.8 s.
+4. **Fake data.** As listed above. Nothing else real is named.
+5. **Committing the videos.** The rendered files live on a separate branch,
+   `portfolio-video`, and never in main's history. On every other branch `out/`
+   is ignored, and there is no PR from that branch to main.
+6. **Square poster.** Yes: `klar-poster-1x1.png`, the same Done moment recomposed
+   for the square.
+
+## 6. Changes made after seeing it rendered
+
+- **Cuts instead of crossfades between light and dark.** A crossfade from the
+  light email scene to the dark History window, and back to the light end card,
+  passes through a flat mid-grey for a third of a second. A cut is cleaner, and it
+  matches "cut to History" in the brief.
+- **Instant switch from History to Voice.** A 6-frame crossfade put two lists on
+  top of each other. The app has no motion on a sidebar click, so the video
+  doesn't either.
+- **Captions never sit on the interface.**
+  - In 16:9 the dark window sits to the right of the caption, or the camera keeps
+    the sidebar's rule to the right of where captions end.
+  - In the square, the window stays above a band of ink at the bottom, where the
+    caption sits.
+- **"Clear history" is out of frame** at the end of the History push-in, rather
+  than cut in half by the edge of the frame.
+- **One thing about the app.** The History list renders 40 px in from its heading.
+  That is the browser's default `padding-left` on the `<ul class="hist">`, which
+  the app's CSS doesn't reset. The video shows it as the app draws it.
+
+## 7. Output
+
+| File | Size |
+|---|---|
+| `klar-16x9.mp4`: H.264 High, CRF 14 | 3.18 MB |
+| `klar-16x9.webm`: VP9, two-pass, CRF 20 | 2.56 MB |
+| `klar-1x1.mp4` | 2.20 MB |
+| `klar-1x1.webm` | 1.84 MB |
+| `klar-poster.png`, `klar-poster-1x1.png` | frame 270 |
+
+- **Format:** all files are 30 fps, 22.000 s and 660 frames, `yuv420p` tagged
+  BT.709, with no audio track.
+- **Colour check:** the ground decodes back to `#F2F2F2`, within one step of
+  `#F3F2F2`.
+- **Where to get them:** the `portfolio-video` branch. `README.md` explains how to
+  re-render them.

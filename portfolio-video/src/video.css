@@ -1,0 +1,292 @@
+/* What the video adds around the app's own interface.
+ *
+ * Colours come from tokens.css. The light scenes pin Ground, Ink and Signal by
+ * value, because the settings window switches the root to the dark theme while
+ * it is on screen and these must not follow it. */
+
+.kv {
+  --kv-ground: #f3f2f2;
+  --kv-ink: #201e1d;
+  --kv-signal: #ec3013;
+
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.kv-stage,
+.kv-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+.kv-stage {
+  overflow: hidden;
+}
+
+.kv-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* — the overlay —
+ * The app animates the pill with CSS transitions, which run on the browser's
+ * clock. A renderer that captures one frame at a time has no clock, so the
+ * transitions are switched off here and each one is redrawn from the frame
+ * number with the same token values (see ui/Pill.tsx). */
+
+.kv-pill .pill,
+.kv-pill .wave__bar,
+.kv-pill .pill__status {
+  transition: none !important;
+}
+
+.kv-pill .pill {
+  width: var(--kv-pill-width) !important;
+}
+
+.kv-pill .wave__bar {
+  width: var(--kv-bar-width) !important;
+  background: var(--kv-bar-colour) !important;
+  opacity: var(--kv-bar-opacity) !important;
+}
+
+.kv-pill .pill__status {
+  color: var(--kv-status-colour) !important;
+}
+
+/* The bars fall to their resting 3 px over 130 ms rather than at once. */
+.kv-pill--falling .wave__bar:nth-child(1) { height: var(--kv-h0) !important; }
+.kv-pill--falling .wave__bar:nth-child(2) { height: var(--kv-h1) !important; }
+.kv-pill--falling .wave__bar:nth-child(3) { height: var(--kv-h2) !important; }
+.kv-pill--falling .wave__bar:nth-child(4) { height: var(--kv-h3) !important; }
+.kv-pill--falling .wave__bar:nth-child(5) { height: var(--kv-h4) !important; }
+.kv-pill--falling .wave__bar:nth-child(6) { height: var(--kv-h5) !important; }
+.kv-pill--falling .wave__bar:nth-child(7) { height: var(--kv-h6) !important; }
+.kv-pill--falling .wave__bar:nth-child(8) { height: var(--kv-h7) !important; }
+.kv-pill--falling .wave__bar:nth-child(9) { height: var(--kv-h8) !important; }
+.kv-pill--falling .wave__bar:nth-child(10) { height: var(--kv-h9) !important; }
+.kv-pill--falling .wave__bar:nth-child(11) { height: var(--kv-h10) !important; }
+.kv-pill--falling .wave__bar:nth-child(12) { height: var(--kv-h11) !important; }
+
+.kv-pill-slot {
+  position: absolute;
+  left: 0;
+  display: flex;
+  justify-content: center;
+}
+
+/* — the ghost line: what was said, before Klar has touched it — */
+
+.kv-ghost {
+  position: absolute;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--color-neutral-500);
+}
+
+.kv-ghost__word {
+  display: inline-block;
+}
+
+/* — the email window —
+ * Somebody else's application, so it is deliberately quieter than Klar:
+ * hairline neutral rules and no red. The 2 px rule and the accent stay Klar's. */
+
+.kv-mail {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
+  box-shadow: var(--shadow-lg);
+  color: var(--kv-ink);
+}
+
+.kv-mail__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding-left: var(--space-4);
+  border-bottom: 1px solid var(--color-neutral-300);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kv-mail__field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--color-neutral-200);
+  font-size: 14px;
+}
+
+.kv-mail__key {
+  width: 52px;
+  color: var(--color-neutral-600);
+}
+
+.kv-mail__body {
+  flex: 1;
+  padding: 20px;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.kv-mail__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.kv-mail__send {
+  padding: 7px 18px;
+  background: var(--kv-ink);
+  color: var(--color-neutral-100);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.kv-mail__discard {
+  font-size: 13px;
+  color: var(--color-neutral-600);
+}
+
+.kv-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin: 0 -1px;
+  vertical-align: -0.2em;
+  background: var(--kv-ink);
+}
+
+/* Window controls, drawn the same in both windows. */
+.kv-controls {
+  display: flex;
+  align-self: stretch;
+  color: var(--color-neutral-600);
+}
+
+.kv-controls__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+}
+
+/* — the settings window — */
+
+.kv-win {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 900px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-neutral-800);
+  box-shadow: var(--shadow-lg);
+  color: var(--color-text);
+}
+
+.kv-win__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding-left: var(--space-3);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.kv-win__bar .kv-controls {
+  color: var(--color-text-secondary);
+}
+
+.kv-win__body {
+  height: 620px;
+}
+
+/* A recording shows no scrollbar; WebView2 draws an overlay one only on hover. */
+.kv-win .panel__body {
+  scrollbar-width: none;
+}
+
+/* Settings → Voice: everything but the Processing row steps back. */
+.kv-focus .nav,
+.kv-focus .panel__head {
+  opacity: var(--kv-dim-chrome);
+}
+
+.kv-focus .panel__body > :not(:first-child) {
+  opacity: var(--kv-dim);
+}
+
+::highlight(kv-sentence) {
+  color: var(--color-text);
+  background-color: color-mix(in srgb, var(--color-accent) 26%, transparent);
+  text-decoration: underline 2px var(--color-accent);
+}
+
+/* — captions — */
+
+.kv-caption {
+  position: absolute;
+  font-family: var(--font-heading);
+  font-size: var(--text-display-m);
+  font-weight: 800;
+  line-height: 31px;
+  letter-spacing: -0.025em;
+  white-space: nowrap;
+}
+
+/* — the end card — */
+
+.kv-end {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  color: var(--kv-ink);
+}
+
+.kv-end__mark {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+}
+
+.kv-end__rule {
+  height: 2px;
+  margin: 30px 0 22px;
+  background: var(--kv-signal);
+}
+
+.kv-end__line {
+  font-family: var(--font-heading);
+  font-size: var(--text-display-m);
+  font-weight: 800;
+  line-height: 31px;
+  letter-spacing: -0.025em;
+}
+
+.kv-end__url {
+  margin-top: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-700);
+}

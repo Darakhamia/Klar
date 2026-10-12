@@ -1,0 +1,6 @@
+node_modules
+# PNG masters and intermediate encodes.
+/build
+# The finished videos live on the `portfolio-video` branch, not here, so the
+# binaries never land in main's history.
+/out
