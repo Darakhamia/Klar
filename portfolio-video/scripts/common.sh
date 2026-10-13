@@ -1,4 +1,4 @@
-# Shared by render.sh and render-card.sh: a browser for Remotion and a bundle.
+# Sourced by render.sh: a browser for Remotion, a bundle, and the checks.
 # Sourced, not run.
 
 # A browser: $REMOTION_BROWSER, else a Playwright headless shell if this

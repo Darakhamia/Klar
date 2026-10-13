@@ -4,3 +4,5 @@ node_modules
 # The finished videos live on the `portfolio-video` branch, not here, so the
 # binaries never land in main's history.
 /out
+# Captures of the app, written by `npm run capture`. Regenerated, never edited.
+/public/captures

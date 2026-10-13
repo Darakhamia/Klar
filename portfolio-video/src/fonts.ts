@@ -1,13 +1,18 @@
 /**
- * Holds the first frame until every Archivo weight the interface uses has
- * loaded — the faces come from @fontsource, the same package the app ships,
- * through global.css. Without this a frame can be drawn in a fallback face.
+ * Archivo, from @fontsource — the package the app ships its own copy from.
+ * The first frame waits until every weight the video sets type in has loaded,
+ * so no frame is ever drawn in a fallback face.
  */
 
+import "@fontsource/archivo/400.css";
+import "@fontsource/archivo/500.css";
+import "@fontsource/archivo/600.css";
+import "@fontsource/archivo/700.css";
+import "@fontsource/archivo/800.css";
 import { cancelRender, continueRender, delayRender } from "remotion";
 
 const WEIGHTS = [400, 500, 600, 700, 800];
-const SAMPLE = "Klar — 0:04 · Speak.";
+const SAMPLE = "Klar — You think faster. getklar.net";
 
 const handle = delayRender("Loading Archivo");
 
