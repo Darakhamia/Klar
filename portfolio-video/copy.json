@@ -1,0 +1,18 @@
+{
+  "raw": "hey so um the build is green now uh can you can you merge it before the standup",
+  "fillers": [
+    "so",
+    "um",
+    "uh",
+    "can you"
+  ],
+  "clean": "Hey, the build is green now. Can you merge it before the standup?",
+  "mail": {
+    "to": "team@example.com",
+    "subject": "Build"
+  },
+  "gpu": "NVIDIA GeForce RTX 4060 (cuda)",
+  "local": "Speech is recognised on this machine and never leaves it.",
+  "site": "getklar.net",
+  "tryHeard": "deploy it to cooper netties after the standup"
+}

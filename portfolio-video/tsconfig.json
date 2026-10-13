@@ -11,13 +11,6 @@
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
     "types": [],
-    // The app's components in ../src resolve their imports from the app's
-    // node_modules, which need not be installed; point them here instead.
-    "paths": {
-      "react": ["./node_modules/@types/react"],
-      "react/*": ["./node_modules/@types/react/*"],
-      "@tauri-apps/api/*": ["./node_modules/@tauri-apps/api/*"]
-    },
 
     "strict": true,
     "noUnusedLocals": true,

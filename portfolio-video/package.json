@@ -3,25 +3,25 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "A silent, looping product video of Klar, rendered with Remotion from the app's own components.",
+  "description": "A silent promo for Klar: the app's own frontend captured with Playwright, animated with Remotion.",
   "scripts": {
+    "capture": "node capture/capture.mjs",
     "studio": "remotion studio src/index.ts",
     "typecheck": "tsc --noEmit",
-    "render": "bash scripts/render.sh",
-    "render:card": "bash scripts/render-card.sh"
+    "render": "bash scripts/render.sh"
   },
   "dependencies": {
     "@fontsource/archivo": "5.3.0",
-    "@remotion/cli": "4.0.535",
     "@remotion/bundler": "4.0.535",
+    "@remotion/cli": "4.0.535",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "remotion": "4.0.535"
   },
   "devDependencies": {
-    "@tauri-apps/api": "2.11.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "playwright": "1.56.1",
     "typescript": "5.9.3"
   }
 }
